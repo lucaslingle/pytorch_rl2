@@ -108,7 +108,6 @@ def generate_meta_episode(
             h_tm1_value_net = h_t_value_net
             t += 1
 
-    meta_episode = credit_assignment(meta_episode)
     return meta_episode
 
 
@@ -282,6 +281,8 @@ def training_loop(
         ppo_opt_epochs: int,
         ppo_clip_param: float,
         ppo_ent_coef: float,
+        gamma: float,
+        lam: float,
         max_pol_iters: int,
         pol_iters_so_far: int,
         policy_checkpoint_fn: Callable[[int], None],
@@ -307,6 +308,8 @@ def training_loop(
         ppo_opt_epochs: optimization epochs for proximal policy optimization.
         ppo_clip_param: clip parameter for proximal policy optimization.
         ppo_ent_coef: entropy bonus coefficient for proximal policy optimization
+        gamma: discount factor gamma.
+        lam: decay parameter lambda for generalized advantage estimation.
         max_pol_iters: the maximum number policy improvements to make.
         pol_iters_so_far: the number of policy improvements made so far.
         policy_checkpoint_fn: a callback for saving checkpoints of policy net.
@@ -330,6 +333,7 @@ def training_loop(
                 value_net=value_net,
                 episode_len=episode_len,
                 num_episodes=episodes_per_meta_episode)
+            meta_episode = credit_assignment(meta_episode, gamma, lam)
             meta_episodes.append(meta_episode)
 
             # logging
