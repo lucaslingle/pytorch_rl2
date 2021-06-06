@@ -112,7 +112,7 @@ def generate_meta_episode(
 
 
 @tc.no_grad()
-def credit_assignment(
+def assign_credit(
         meta_episode: MetaEpisode,
         gamma: float,
         lam: float
@@ -333,7 +333,7 @@ def training_loop(
                 value_net=value_net,
                 episode_len=episode_len,
                 num_episodes=episodes_per_meta_episode)
-            meta_episode = credit_assignment(meta_episode, gamma=gamma, lam=lam)
+            meta_episode = assign_credit(meta_episode, gamma=gamma, lam=lam)
             meta_episodes.append(meta_episode)
 
             # logging
