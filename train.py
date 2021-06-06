@@ -102,9 +102,9 @@ def generate_meta_episode(
             t += 1
             h_tm1_policy_net = h_t_policy_net
             h_tm1_value_net = h_t_value_net
-            a_tm1 = np.array([a_t.squeeze(0).detach().numpy()])
-            r_tm1 = np.array([r_t])
-            d_tm1 = np.array([done_t])
+            a_tm1 = np.array([meta_episode.acs[t]])
+            r_tm1 = np.array([meta_episode.dones[t]])
+            d_tm1 = np.array([meta_episode.dones[t]])
             o_t = o_tp1
 
     meta_episode = credit_assignment(meta_episode)
