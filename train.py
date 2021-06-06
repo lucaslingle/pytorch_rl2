@@ -324,7 +324,7 @@ def training_loop(
         meta_episodes = list()
         for _ in range(0, meta_episodes_per_policy_update):
             # collect one meta-episode and append it to the list
-            meta_episode, local_metrics = generate_meta_episode(
+            meta_episode = generate_meta_episode(
                 env=env,
                 policy_net=policy_net,
                 value_net=value_net,
