@@ -3,10 +3,11 @@ Implements training loop for the bandit agent from Duan et al., 2016
 - 'RL^2: Fast Reinforcement Learning via Slow Reinforcement Learning'
 """
 
-from typing import Iterator, Tuple, Dict, Optional, List
-from collections import namedtuple, deque
+from typing import Dict, Optional, List, Callable
+from dataclasses import dataclass
+from collections import deque
+from functools import partial
 import argparse
-from copy import deepcopy
 
 import torch as tc
 import numpy as np
@@ -19,171 +20,156 @@ from rl2.utils.checkpoint_util import maybe_load_checkpoint, save_checkpoint
 from rl2.utils.constants import ROOT_RANK
 
 
-TrajSegmentExperience = namedtuple(
-    typename='TrajSegmentExperience',
-    field_names=[
-        'obs', 'acs', 'rews', 'dones',
-        'logpacs', 'vpreds', 'tdlam_rets', 'advs',
-    ])
-
-TrajSegmentMetrics = Dict[str, List[float]]
+@dataclass
+class MetaEpisode:
+    def __init__(self, episode_len, num_episodes, dummy_obs):
+        self.horizon = episode_len * num_episodes
+        self.obs = np.array([dummy_obs for _ in range(self.horizon)])
+        self.acs = np.zeros(self.horizon, 'int64')
+        self.rews = np.zeros(self.horizon, 'float32')
+        self.dones = np.zeros(self.horizon, 'float32')
+        self.logpacs = np.zeros(self.horizon, 'float32')
+        self.vpreds = np.zeros(self.horizon, 'float32')
+        self.advs = np.zeros(self.horizon, 'float32')
+        self.tdlam_rets = np.zeros(self.horizon, 'float32')
 
 
 @tc.no_grad()
-def _traj_segment_generator(
-        env: BanditEnv,
-        policy_net: PolicyNetworkMAB,
-        value_net: ValueNetworkMAB,
-        traj_seg_length: int
-    ) -> Iterator[Tuple[TrajSegmentExperience, TrajSegmentMetrics]]:
+def generate_meta_episode(
+        env: MDPEnv,
+        policy_net: PolicyNetworkMDP,
+        value_net: ValueNetworkMDP,
+        episode_len: int,
+        num_episodes: int
+    ) -> MetaEpisode:
     """
-    Returns a stateful generator of trajectory segments.
-    Assumes the boundary for each MAB problem aligns with
-    traj_seg_length, and resets the env MAB problem after each yield.
+    Generates a meta-episode: a sequence of episodes concatenated together,
+    with decisions being make by a recurrent agent with state preserved
+    across episode boundaries.
 
     Args:
         env: environment.
         policy_net: policy network.
         value_net: value network.
-        traj_seg_length: timesteps per trajectory segment.
+        episode_len: timesteps per episode.
+        num_episodes: episodes per meta-episode.
 
     Returns:
-        Iterator of experience, metric tuples.
+        meta_episode: an instance of the meta-episode dataclass.
     """
 
-    traj_seg = TrajSegmentExperience(
-        obs=np.array([None for _ in range(traj_seg_length)]),
-        acs=np.zeros(traj_seg_length, 'int64'),
-        rews=np.zeros(traj_seg_length, 'float32'),
-        dones=np.zeros(traj_seg_length, 'float32'),
-        logpacs=np.zeros(traj_seg_length, 'float32'),
-        vpreds=np.zeros(traj_seg_length+1, 'float32'),
-        tdlam_rets=np.zeros(traj_seg_length, 'float32'),
-        advs=np.zeros(traj_seg_length, 'float32'),
-    )
-
-    current_ep_return = 0.0
-    metrics = {
-        "ep_returns": []
-    }
-
+    env.new_mdp()
     t = 0
-    h_tm1_policy_net = None
-    h_tm1_value_net = None
-    a_tm1 = None
-    r_tm1 = None
-    d_tm1 = None
-    o_t = None
+    h_tm1_policy_net = policy_net.initial_state(batch_size=1)
+    h_tm1_value_net = value_net.initial_state(batch_size=1)
+    a_tm1 = np.array([0])
+    r_tm1 = np.array([0.0])
+    d_tm1 = np.array([1.0])
+    o_t = env.reset()
 
-    while True:
-        if t > 0 and t % traj_seg_length == 0:
-            traj_seg.vpreds[-1] = 0.0
-            yield traj_seg, metrics
-            metrics['ep_returns'] = []
-            env.new_mdp()
+    meta_episode = MetaEpisode(
+        episode_len=episode_len,
+        num_episodes=num_episodes,
+        dummy_obs=o_t)
 
-        if t % traj_seg_length == 0:
-            h_tm1_policy_net = policy_net.initial_state(batch_size=1)
-            h_tm1_value_net = value_net.initial_state(batch_size=1)
-            a_tm1 = np.array([0])
-            r_tm1 = np.array([0.0])
-            d_tm1 = np.array([1.0])
-            o_t = None
+    for episode_num in range(0, num_episodes):
+        for episode_step in range(0, episode_len):
 
-        pi_dist_t, h_t_policy_net = policy_net(
-            prev_action=tc.LongTensor(a_tm1),
-            prev_reward=tc.FloatTensor(r_tm1),
-            prev_done=tc.FloatTensor(d_tm1),
-            prev_state=h_tm1_policy_net)
+            pi_dist_t, h_t_policy_net = policy_net(
+                prev_action=tc.LongTensor(a_tm1),
+                prev_reward=tc.FloatTensor(r_tm1),
+                prev_done=tc.FloatTensor(d_tm1),
+                prev_state=h_tm1_policy_net)
 
-        vpred_t, h_t_value_net = value_net(
-            prev_action=tc.LongTensor(a_tm1),
-            prev_reward=tc.FloatTensor(r_tm1),
-            prev_done=tc.FloatTensor(d_tm1),
-            prev_state=h_tm1_value_net)
+            vpred_t, h_t_value_net = value_net(
+                prev_action=tc.LongTensor(a_tm1),
+                prev_reward=tc.FloatTensor(r_tm1),
+                prev_done=tc.FloatTensor(d_tm1),
+                prev_state=h_tm1_value_net)
 
-        a_t = pi_dist_t.sample()
-        log_prob_a_t = pi_dist_t.log_prob(a_t)
+            a_t = pi_dist_t.sample()
+            log_prob_a_t = pi_dist_t.log_prob(a_t)
 
-        o_tp1, r_t, done_t, _ = env.step(a_t)
+            o_tp1, r_t, done_t, _ = env.step(a_t)
 
-        i = t % traj_seg_length
-        traj_seg.obs[i] = o_t
-        traj_seg.acs[i] = a_t.squeeze(0).detach().numpy()
-        traj_seg.rews[i] = r_t
-        traj_seg.dones[i] = done_t
-        traj_seg.logpacs[i] = log_prob_a_t.squeeze(0).detach().numpy()
-        traj_seg.vpreds[i] = vpred_t.squeeze(0).detach().numpy()
+            meta_episode.obs[t] = o_t
+            meta_episode.acs[t] = a_t.squeeze(0).detach().numpy()
+            meta_episode.rews[t] = r_t
+            meta_episode.dones[t] = done_t
+            meta_episode.logpacs[t] = log_prob_a_t.squeeze(0).detach().numpy()
+            meta_episode.vpreds[t] = vpred_t.squeeze(0).detach().numpy()
 
-        current_ep_return += r_t
-        if i == traj_seg_length-1:
-            metrics['ep_returns'].append(current_ep_return)
-            current_ep_return = 0.0
+            t += 1
+            h_tm1_policy_net = h_t_policy_net
+            h_tm1_value_net = h_t_value_net
+            a_tm1 = np.array([a_t.squeeze(0).detach().numpy()])
+            r_tm1 = np.array([r_t])
+            d_tm1 = np.array([done_t])
+            o_t = o_tp1
 
-        t += 1
-        h_tm1_policy_net = h_t_policy_net
-        h_tm1_value_net = h_t_value_net
-        a_tm1 = np.array([a_t.squeeze(0).detach().numpy()])
-        r_tm1 = np.array([r_t])
-        d_tm1 = np.array([traj_seg.dones[i]])
-        o_t = o_tp1
+    meta_episode = credit_assignment(meta_episode)
+    return meta_episode
 
 
 @tc.no_grad()
-def _add_vtarg_and_adv(
-        traj_seg: TrajSegmentExperience,
+def credit_assignment(
+        meta_episode: MetaEpisode,
         gamma: float,
         lam: float
-    ) -> TrajSegmentExperience:
+    ) -> MetaEpisode:
     """
     Compute td lambda returns and generalized advantage estimates.
 
+    Note that in the meta-episodic setting of RL^2, the objective is
+    to maximize the expected discounted return of the meta-episode,
+    so we do not utilize the usual 'done' masking in this function.
+
     Args:
-        traj_seg: trajectory segment.
+        meta_episode: meta-episode.
         gamma: discount factor.
         lam: GAE decay parameter.
 
     Returns:
-        traj_seg
+        meta_episode: an instance of the meta-episode dataclass,
+        with updated advantage estimates and td lambda returns computed.
     """
-    T = len(traj_seg.acs)
+    T = len(meta_episode.acs)
     for t in reversed(range(1, T+1)):  # T, ..., 1.
-        r_t = traj_seg.rews[t-1]
-        V_t = traj_seg.vpreds[t-1]
-        V_tp1 = traj_seg.vpreds[t]
-        A_tp1 = traj_seg.advs[t] if t < T else 0.0
-        mask_t = 1.0 if t < T else 0.0
-        delta_t = -V_t + r_t + gamma * mask_t * V_tp1
-        A_t = delta_t + gamma * lam * mask_t * A_tp1
-        traj_seg.advs[t-1] = A_t
+        r_t = meta_episode.rews[t-1]
+        V_t = meta_episode.vpreds[t-1]
+        V_tp1 = meta_episode.vpreds[t] if t < T else 0.0
+        A_tp1 = meta_episode.advs[t] if t < T else 0.0
+        delta_t = -V_t + r_t + gamma * V_tp1
+        A_t = delta_t + gamma * lam * A_tp1
+        meta_episode.advs[t-1] = A_t
 
-    traj_seg.tdlam_rets[:] = traj_seg.vpreds[0:-1] + traj_seg.advs
-    return traj_seg
+    meta_episode.tdlam_rets[:] = meta_episode.vpreds[0:-1] + meta_episode.advs
+    return meta_episode
 
 
-def _compute_losses(
+def compute_losses(
+        meta_episodes: List[MetaEpisode],
         policy_net: PolicyNetworkMDP,
         value_net: ValueNetworkMDP,
-        traj_segs: List[TrajSegmentExperience],
         clip_param: float,
         ent_coef: float
     ) -> Dict[str, tc.Tensor]:
     """
-    Computes the losses for PPO using the policy network and value network.
+    Computes the losses for Proximal Policy Optimization.
 
     Args:
+        meta_episodes: list of meta-episodes.
         policy_net: policy network.
         value_net: value network.
-        traj_segs: list of trajectory segments w/ updated advs & td lam returns.
-        clip_param: clip parameter.
-        ent_coef: entropy coefficient.
+        clip_param: clip parameter for PPO.
+        ent_coef: entropy coefficient for PPO.
 
     Returns:
         loss_dict: a dictionary of losses.
     """
     def get_tensor(field, dtype=None):
         mb_field = np.stack(
-            list(map(lambda seg: getattr(seg, field), traj_segs)),
+            list(map(lambda metaep: getattr(metaep, field), meta_episodes)),
             axis=0)
         if dtype == 'long':
             return tc.LongTensor(mb_field)
@@ -198,8 +184,8 @@ def _compute_losses(
 
     # we are going to manually loop over the timesteps here,
     # for backprop thru time.
-    B = len(traj_segs)
-    T = len(traj_segs[0].acs)
+    B = len(meta_episodes)
+    T = len(meta_episodes[0].acs)
     t = 1
     h_tm1_policy_net = policy_net.initial_state(batch_size=B)
     h_tm1_value_net = value_net.initial_state(batch_size=B)
@@ -274,7 +260,7 @@ def _compute_losses(
     }
 
 
-def _train(
+def training_loop(
         env: MDPEnv,
         policy_net: PolicyNetworkMDP,
         value_net: ValueNetworkMDP,
@@ -282,12 +268,21 @@ def _train(
         value_optimizer: tc.optim.Optimizer,
         policy_scheduler: Optional[tc.optim.lr_scheduler._LRScheduler],  # pylint: disable=W0212
         value_scheduler: Optional[tc.optim.lr_scheduler._LRScheduler],  # pylint: disable=W0212
-        args: argparse.Namespace,
-        env_steps_so_far: int
+        episode_len: int,
+        episodes_per_meta_episode: int,
+        meta_episodes_per_actor_batch: int,
+        meta_episodes_per_policy_update: int,
+        ppo_opt_epochs: int,
+        ppo_clip_param: float,
+        ppo_ent_coef: float,
+        max_pol_steps: int,
+        pol_steps_so_far: int,
+        policy_checkpoint_fn: Callable[[int], None],
+        value_checkpoint_fn: Callable[[int], None]
     ) -> None:
     """
-    Train the agent by PPO to solve multi-armed bandit problems
-    sampled from the distribution used in Duan et al., 2016.
+    Train a stateful RL^2 agent via PPO to maximize discounted cumulative reward
+    in Tabular MDPs, sampled from the distribution used in Duan et al., 2016.
 
     Args:
         env: environment.
@@ -297,109 +292,95 @@ def _train(
         value_optimizer: value optimizer.
         policy_scheduler: policy lr scheduler.
         value_scheduler: value lr scheduler.
-        args: argparsed args.
-        env_steps_so_far: environment steps so far.
+        episode_len: timesteps per episode.
+        episodes_per_meta_episode: episodes per meta-episode.
+        meta_episodes_per_actor_batch: meta-episodes per batch on each process.
+        meta_episodes_per_policy_update: meta-episodes per policy improvement
+            on each process.
+        ppo_opt_epochs: optimization epochs for proximal policy optimization.
+        ppo_clip_param: clip parameter for proximal policy optimization.
+        ppo_ent_coef: entropy bonus coefficient for proximal policy optimization
+        max_pol_steps: max number of policy improvement steps to take.
+        pol_steps_so_far: number of policy improvement steps so far.
+        policy_checkpoint_fn: a callback for saving checkpoints of policy net.
+        value_checkpoint_fn: a callback for saving checkpoints of value net.
 
     Returns:
         None
     """
     comm = get_comm()
-    traj_seg_gen = _traj_segment_generator(
-        env=env,
-        policy_net=policy_net,
-        value_net=value_net,
-        traj_seg_length=args.traj_seg_length)
+    meta_ep_returns = deque(maxlen=1000)
 
-    policy_improvement_step = 0
-    collection_step = 0
-    traj_segs = []
-    ep_returns = deque(maxlen=1000)
-    while policy_improvement_step < args.max_policy_iterations:
-        # update traj_segs with new seg.
-        traj_seg, local_metrics = next(traj_seg_gen)
-        traj_seg, local_metrics = deepcopy(traj_seg), deepcopy(local_metrics)
-        traj_seg = _add_vtarg_and_adv(traj_seg, gamma=args.gamma, lam=args.lam)
-        traj_segs.append(traj_seg)
+    for pol_step in range(pol_steps_so_far, max_pol_steps):
 
-        # update episode returns after each trajectory.
-        global_ep_returns = comm.allgather(local_metrics['ep_returns'])
-        global_ep_returns = [x for loc in global_ep_returns for x in loc]
-        ep_returns.extend(global_ep_returns)
+        # collect meta-episodes...
+        meta_episodes = list()
+        for _ in range(0, meta_episodes_per_policy_update):
+            # collect one meta-episode and append it to the list
+            meta_episode, local_metrics = generate_meta_episode(
+                env=env,
+                policy_net=policy_net,
+                value_net=value_net,
+                episode_len=episode_len,
+                num_episodes=episodes_per_meta_episode)
+            meta_episodes.append(meta_episode)
 
-        collection_step += 1
+            # logging
+            l_meta_ep_returns = [np.sum(meta_episode.rews)]
+            g_meta_ep_returns = comm.allgather(l_meta_ep_returns)
+            g_meta_ep_returns = [x for loc in g_meta_ep_returns for x in loc]
+            meta_ep_returns.extend(g_meta_ep_returns)
 
-        if collection_step % args.optim_nseg_per_actor == 0:
-            for opt_epoch in range(args.optim_epochs):
-                idxs = np.random.permutation(args.optim_nseg_per_actor)
-                for i in range(0, args.optim_nseg_per_actor, args.optim_nseg_per_gradstep):
-                    mb_idxs = idxs[i:i+args.optim_nseg_per_gradstep]
-                    mb_traj_segs = [traj_segs[idx] for idx in mb_idxs]
-                    losses = _compute_losses(
-                        policy_net=policy_net,
-                        value_net=value_net,
-                        traj_segs=mb_traj_segs,
-                        clip_param=args.clip_param,
-                        ent_coef=args.ent_coef)
+        for opt_epoch in range(ppo_opt_epochs):
+            idxs = np.random.permutation(meta_episodes_per_policy_update)
+            for i in range(0, meta_episodes_per_policy_update, meta_episodes_per_actor_batch):
+                mb_idxs = idxs[i:i+meta_episodes_per_actor_batch]
+                mb_meta_eps = [meta_episodes[idx] for idx in mb_idxs]
+                losses = compute_losses(
+                    meta_episodes=mb_meta_eps,
+                    policy_net=policy_net,
+                    value_net=value_net,
+                    clip_param=ppo_clip_param,
+                    ent_coef=ppo_ent_coef)
 
-                    policy_optimizer.zero_grad()
-                    losses['policy_loss'].backward()
-                    sync_grads(model=policy_net, comm=comm)
-                    policy_optimizer.step()
-                    if policy_scheduler:
-                        policy_scheduler.step()
+                policy_optimizer.zero_grad()
+                losses['policy_loss'].backward()
+                sync_grads(model=policy_net, comm=comm)
+                policy_optimizer.step()
+                if policy_scheduler:
+                    policy_scheduler.step()
 
-                    value_optimizer.zero_grad()
-                    losses['value_loss'].backward()
-                    sync_grads(model=value_net, comm=comm)
-                    value_optimizer.step()
-                    if value_scheduler:
-                        value_scheduler.step()
+                value_optimizer.zero_grad()
+                losses['value_loss'].backward()
+                sync_grads(model=value_net, comm=comm)
+                value_optimizer.step()
+                if value_scheduler:
+                    value_scheduler.step()
 
-                global_losses = {}
-                for name in losses:
-                    loss_sum = comm.allreduce(losses[name], op=MPI.SUM)
-                    loss_avg = loss_sum / comm.Get_size()
-                    global_losses[name] = loss_avg
-
-                if comm.Get_rank() == ROOT_RANK:
-                    print(f"pol iter {policy_improvement_step}, opt_epoch: {opt_epoch}...")
-                    for name, value in global_losses.items():
-                        print(f"\t{name}: {value:>0.6f}")
+            global_losses = {}
+            for name in losses:
+                loss_sum = comm.allreduce(losses[name], op=MPI.SUM)
+                loss_avg = loss_sum / comm.Get_size()
+                global_losses[name] = loss_avg
 
             if comm.Get_rank() == ROOT_RANK:
-                print("-" * 100)
-                print(f"mean_ep_return: {np.mean(ep_returns)}")
-                print("-" * 100)
+                print(f"pol iter {pol_step}, opt_epoch: {opt_epoch}...")
+                for name, value in global_losses.items():
+                    print(f"\t{name}: {value:>0.6f}")
 
-            # we completed one policy improvement step.
-            policy_improvement_step += 1
-            traj_segs = []
+        if comm.Get_rank() == ROOT_RANK:
+            print("-" * 100)
+            print(f"mean meta-episode return: {np.mean(meta_ep_returns)}")
+            print("-" * 100)
 
-            # maybe checkpoint.
-            if True:
-                if comm.Get_rank() == 0:
-                    save_checkpoint(
-                        checkpoint_dir=args.checkpoint_dir,
-                        model_name=f"{args.model_name}/policy_net",
-                        model=policy_net,
-                        optimizer=policy_optimizer,
-                        scheduler=policy_scheduler,
-                        steps=env_steps_so_far)
-
-                    save_checkpoint(
-                        checkpoint_dir=args.checkpoint_dir,
-                        model_name=f"{args.model_name}/value_net",
-                        model=value_net,
-                        optimizer=value_optimizer,
-                        scheduler=value_scheduler,
-                        steps=env_steps_so_far)
-
-        # after each collection step, update env steps.
-        # then collect more experience.
-        env_steps_so_far += args.traj_seg_length * comm.Get_size()
+        # maybe checkpoint.
+        if True:
+            if comm.Get_rank() == 0:
+                policy_checkpoint_fn(pol_step)
+                value_checkpoint_fn(pol_step)
 
 
-def _get_argparser():
+def create_argparser():
     parser = argparse.ArgumentParser(
         description="""Training script.""")
     parser.add_argument("--max_policy_iterations", type=int, default=1000)
@@ -423,8 +404,10 @@ def _get_argparser():
     return parser
 
 
-def main():   # pylint: disable=C0116
-    args = _get_argparser().parse_args()
+def main():
+    args = create_argparser().parse_args()
+
+    # create env and learning system.
     env = MDPEnv(
         num_states=args.num_states,
         num_actions=args.num_actions,
@@ -449,8 +432,9 @@ def main():   # pylint: disable=C0116
     policy_scheduler = None
     value_scheduler = None
 
+    # load checkpoint, if applicable.
     comm = get_comm()
-    env_steps_so_far = 0
+    pol_steps_so_far = 0
     if comm.Get_rank() == 0:
         steps_policy = maybe_load_checkpoint(
             checkpoint_dir=args.checkpoint_dir,
@@ -471,17 +455,16 @@ def main():   # pylint: disable=C0116
         if steps_policy != steps_value:
             raise RuntimeError(
                 "Policy steps not equal to value steps in latest checkpoint!")
-        env_steps_so_far = steps_policy
+        pol_steps_so_far = steps_policy
 
-    env_steps_so_far = comm.bcast(env_steps_so_far, root=ROOT_RANK)
-
+    # sync state.
+    pol_steps_so_far = comm.bcast(pol_steps_so_far, root=ROOT_RANK)
     sync_state(
         model=policy_net,
         optimizer=policy_optimizer,
         scheduler=policy_scheduler,
         comm=comm,
         root=ROOT_RANK)
-
     sync_state(
         model=value_net,
         optimizer=value_optimizer,
@@ -489,7 +472,25 @@ def main():   # pylint: disable=C0116
         comm=comm,
         root=ROOT_RANK)
 
-    _train(
+    # make callback functions for checkpointing.
+    policy_checkpoint_fn = partial(
+        save_checkpoint,
+        checkpoint_dir=args.checkpoint_dir,
+        model_name=f"{args.model_name}/policy_net",
+        model=policy_net,
+        optimizer=policy_optimizer,
+        scheduler=policy_scheduler)
+
+    value_checkpoint_fn = partial(
+        save_checkpoint,
+        checkpoint_dir=args.checkpoint_dir,
+        model_name=f"{args.model_name}/value_net",
+        model=value_net,
+        optimizer=value_optimizer,
+        scheduler=value_scheduler)
+
+    # run it!
+    training_loop(
         env=env,
         policy_net=policy_net,
         value_net=value_net,
@@ -497,9 +498,17 @@ def main():   # pylint: disable=C0116
         value_optimizer=value_optimizer,
         policy_scheduler=policy_scheduler,
         value_scheduler=value_scheduler,
-        args=args,
-        env_steps_so_far=env_steps_so_far
-    )
+        episode_len=args.episode_len,
+        episodes_per_meta_episode=args.episodes_per_meta_episode,
+        meta_episodes_per_actor_batch=args.meta_episodes_per_actor_batch,
+        meta_episodes_per_policy_update=args.meta_episodes_per_policy_update,
+        ppo_opt_epochs=args.ppo_opt_epochs,
+        ppo_clip_param=args.ppo_clip_param,
+        ppo_ent_coef=args.ppo_ent_coef,
+        max_pol_steps=args.max_pol_steps,
+        pol_steps_so_far=pol_steps_so_far,
+        policy_checkpoint_fn=policy_checkpoint_fn,
+        value_checkpoint_fn=value_checkpoint_fn)
 
 
 if __name__ == '__main__':
