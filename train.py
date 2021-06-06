@@ -191,6 +191,7 @@ def compute_losses(
     t = 1
     h_tm1_policy_net = policy_net.initial_state(batch_size=B)
     h_tm1_value_net = value_net.initial_state(batch_size=B)
+    o_t = mb_obs[:, 0]
     a_tm1 = tc.zeros(dtype=tc.int64, size=(B,))
     r_tm1 = tc.zeros(dtype=tc.float32, size=(B,))
     d_tm1 = tc.ones(dtype=tc.float32, size=(B,))
@@ -200,12 +201,14 @@ def compute_losses(
     logpacs_new = []
     while t < T+1:
         pi_dist_t, h_t_policy_net = policy_net(
+            curr_obs=o_t,
             prev_action=a_tm1,
             prev_reward=r_tm1,
             prev_done=d_tm1,
             prev_state=h_tm1_policy_net)
 
         vpred_t, h_t_value_net = value_net(
+            curr_obs=o_t,
             prev_action=a_tm1,
             prev_reward=r_tm1,
             prev_done=d_tm1,
@@ -214,6 +217,7 @@ def compute_losses(
         ent_t = pi_dist_t.entropy()
         entropies.append(ent_t)
 
+        o_tp1 = mb_obs[:, t]
         a_t = mb_acs[:, t-1]
         r_t = mb_rews[:, t-1]
         d_t = mb_dones[:, t-1]
@@ -222,12 +226,13 @@ def compute_losses(
         logpacs_new.append(logprob_a_t_new)
         vpreds_new.append(vpred_t)
 
-        t += 1
-        h_tm1_policy_net = h_t_policy_net
-        h_tm1_value_net = h_t_value_net
+        o_t = o_tp1
         a_tm1 = a_t
         r_tm1 = r_t
         d_tm1 = d_t
+        h_tm1_policy_net = h_t_policy_net
+        h_tm1_value_net = h_t_value_net
+        t += 1
 
     # assemble relevant gradient-tracked quantities from our loop above.
     entropies = tc.stack(entropies, dim=1)

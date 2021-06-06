@@ -66,7 +66,7 @@ class TabularMDP_GRU(tc.nn.Module):
             prev_action,
             prev_reward,
             prev_done,
-            prev_hidden
+            prev_state
     ):
         """
         Run recurrent state update and return new state.
@@ -75,7 +75,7 @@ class TabularMDP_GRU(tc.nn.Module):
             prev_action: prev timestep action as tc.LongTensor w/ shape [B]
             prev_reward: prev timestep rew as tc.FloatTensor w/ shape [B]
             prev_done: prev timestep done flag as tc.FloatTensor w/ shape [B]
-            prev_hidden: prev hidd state w/ shape [B, H].
+            prev_state: prev hidd state w/ shape [B, H].
 
         Returns:
             new_state.
@@ -84,12 +84,12 @@ class TabularMDP_GRU(tc.nn.Module):
         emb_a = self._action_emb(prev_action)
         prev_reward = prev_reward.unsqueeze(-1)
         prev_done = prev_done.unsqueeze(-1)
-        input_vec = tc.cat((emb_o, emb_a, prev_reward, prev_done), dim=-1)
-        z = tc.nn.Sigmoid()(self._x2z(input_vec) + self._h2z(prev_hidden))
-        r = tc.nn.Sigmoid()(self._x2r(input_vec) + self._h2r(prev_hidden))
-        hhat = tc.nn.ReLU()(self._x2hhat(input_vec) +
-                            self._rh2hhat(r * prev_hidden))
-        h = (1. - z) * prev_hidden + z * hhat
+        in_vec = tc.cat((emb_o, emb_a, prev_reward, prev_done), dim=-1)
+        z = tc.nn.Sigmoid()(self._x2z(in_vec) + self._h2z(prev_state))
+        r = tc.nn.Sigmoid()(self._x2r(in_vec) + self._h2r(prev_state))
+        hhat = tc.nn.ReLU()(
+            self._x2hhat(in_vec) + self._rh2hhat(r * prev_state))
+        h = (1. - z) * prev_state + z * hhat
         new_state = h
 
         return new_state
@@ -121,14 +121,14 @@ class ValueNetworkMDP(tc.nn.Module):
         prev_action,
         prev_reward,
         prev_done,
-        prev_hidden
+        prev_state
     ):  # pylint: disable=C0116
         new_state = self._memory(
             curr_obs=curr_obs,
             prev_action=prev_action,
             prev_reward=prev_reward,
             prev_done=prev_done,
-            prev_hidden=prev_hidden)
+            prev_state=prev_state)
         v_pred = self._value_head(new_state)
         return v_pred, new_state
 
@@ -160,13 +160,13 @@ class PolicyNetworkMDP(tc.nn.Module):
         prev_action,
         prev_reward,
         prev_done,
-        prev_hidden
+        prev_state
     ):  # pylint: disable=C0116
         new_state = self._memory(
             curr_obs=curr_obs,
             prev_action=prev_action,
             prev_reward=prev_reward,
             prev_done=prev_done,
-            prev_hidden=prev_hidden)
+            prev_state=prev_state)
         pi_dist = self._policy_head(new_state)
         return pi_dist, new_state
