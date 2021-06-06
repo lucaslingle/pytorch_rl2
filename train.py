@@ -333,7 +333,7 @@ def training_loop(
                 value_net=value_net,
                 episode_len=episode_len,
                 num_episodes=episodes_per_meta_episode)
-            meta_episode = credit_assignment(meta_episode, gamma, lam)
+            meta_episode = credit_assignment(meta_episode, gamma=gamma, lam=lam)
             meta_episodes.append(meta_episode)
 
             # logging
