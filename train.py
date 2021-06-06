@@ -74,7 +74,6 @@ def generate_meta_episode(
 
     for episode_num in range(0, num_episodes):
         for episode_step in range(0, episode_len):
-            # evaluate inputs.
             pi_dist_t, h_t_policy_net = policy_net(
                 curr_obs=tc.LongTensor(o_t),
                 prev_action=tc.LongTensor(a_tm1),
@@ -92,10 +91,8 @@ def generate_meta_episode(
             a_t = pi_dist_t.sample()
             log_prob_a_t = pi_dist_t.log_prob(a_t)
 
-            # interact.
             o_tp1, r_t, done_t, _ = env.step(a_t, auto_reset=True)
 
-            # record.
             meta_episode.obs[t] = o_t
             meta_episode.acs[t] = a_t.squeeze(0).detach().numpy()
             meta_episode.rews[t] = r_t
@@ -103,7 +100,6 @@ def generate_meta_episode(
             meta_episode.logpacs[t] = log_prob_a_t.squeeze(0).detach().numpy()
             meta_episode.vpreds[t] = vpred_t.squeeze(0).detach().numpy()
 
-            # for next timestep, t+1.
             o_t = o_tp1
             a_tm1 = np.array([meta_episode.acs[t]])
             r_tm1 = np.array([meta_episode.rews[t]])
