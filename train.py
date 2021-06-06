@@ -95,7 +95,7 @@ def generate_meta_episode(
             meta_episode.obs[t] = o_t
             meta_episode.acs[t] = a_t.squeeze(0).detach().numpy()
             meta_episode.rews[t] = r_t
-            meta_episode.dones[t] = done_t
+            meta_episode.dones[t] = float(done_t)
             meta_episode.logpacs[t] = log_prob_a_t.squeeze(0).detach().numpy()
             meta_episode.vpreds[t] = vpred_t.squeeze(0).detach().numpy()
 
