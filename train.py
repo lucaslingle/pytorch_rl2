@@ -3,7 +3,7 @@ Implements training loop for the bandit agent from Duan et al., 2016
 - 'RL^2: Fast Reinforcement Learning via Slow Reinforcement Learning'
 """
 
-from typing import Dict, Optional, List, Callable
+from typing import List, Dict, Optional, Callable
 from dataclasses import dataclass
 from collections import deque
 from functools import partial
@@ -44,7 +44,7 @@ def generate_meta_episode(
     ) -> MetaEpisode:
     """
     Generates a meta-episode: a sequence of episodes concatenated together,
-    with decisions being make by a recurrent agent with state preserved
+    with decisions being made by a recurrent agent with state preserved
     across episode boundaries.
 
     Args:
@@ -144,7 +144,7 @@ def credit_assignment(
         A_t = delta_t + gamma * lam * A_tp1
         meta_episode.advs[t-1] = A_t
 
-    meta_episode.tdlam_rets[:] = meta_episode.vpreds + meta_episode.advs
+    meta_episode.tdlam_rets = meta_episode.vpreds + meta_episode.advs
     return meta_episode
 
 
@@ -396,6 +396,7 @@ def create_argparser():
     parser.add_argument("--checkpoint_dir", type=str, default='checkpoints')
     parser.add_argument("--checkpoint_interval", type=int, default=10)
     parser.add_argument("--episode_len", type=int, default=10)
+    parser.add_argument("--episodes_per_meta_episode", type=int, default=10)
     parser.add_argument("--ppo_opt_epochs", type=int, default=4)
     parser.add_argument("--meta_episodes_per_policy_update", type=int, default=30000//10)
     parser.add_argument("--meta_episodes_per_actor_batch", type=int, default=60)
