@@ -60,12 +60,12 @@ def generate_meta_episode(
 
     env.new_mdp()
     t = 0
-    h_tm1_policy_net = policy_net.initial_state(batch_size=1)
-    h_tm1_value_net = value_net.initial_state(batch_size=1)
+    o_t = env.reset()
     a_tm1 = np.array([0])
     r_tm1 = np.array([0.0])
     d_tm1 = np.array([1.0])
-    o_t = env.reset()
+    h_tm1_policy_net = policy_net.initial_state(batch_size=1)
+    h_tm1_value_net = value_net.initial_state(batch_size=1)
 
     meta_episode = MetaEpisode(
         episode_len=episode_len,
@@ -189,12 +189,12 @@ def compute_losses(
     B = len(meta_episodes)
     T = len(meta_episodes[0].acs)
     t = 1
-    h_tm1_policy_net = policy_net.initial_state(batch_size=B)
-    h_tm1_value_net = value_net.initial_state(batch_size=B)
     o_t = mb_obs[:, 0]
     a_tm1 = tc.zeros(dtype=tc.int64, size=(B,))
     r_tm1 = tc.zeros(dtype=tc.float32, size=(B,))
     d_tm1 = tc.ones(dtype=tc.float32, size=(B,))
+    h_tm1_policy_net = policy_net.initial_state(batch_size=B)
+    h_tm1_value_net = value_net.initial_state(batch_size=B)
 
     entropies = []
     vpreds_new = []
