@@ -419,11 +419,11 @@ def main():
 
     policy_optimizer = tc.optim.Adam(
         params=policy_net.parameters(),
-        lr=args.optim_stepsize,
+        lr=args.lr,
         eps=1e-5)
     value_optimizer = tc.optim.Adam(
         params=value_net.parameters(),
-        lr=args.optim_stepsize,
+        lr=args.lr,
         eps=1e-5)
 
     policy_scheduler = None
@@ -432,7 +432,7 @@ def main():
     # load checkpoint, if applicable.
     comm = get_comm()
     pol_iters_so_far = 0
-    if comm.Get_rank() == 0:
+    if comm.Get_rank() == ROOT_RANK:
         a = maybe_load_checkpoint(
             checkpoint_dir=args.checkpoint_dir,
             model_name=f"{args.model_name}/policy_net",
