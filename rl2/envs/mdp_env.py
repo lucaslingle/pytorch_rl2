@@ -43,7 +43,7 @@ class MDPEnv:
 
         self._state_transition_probabilities = np.stack(p_aijs, axis=0)
 
-    def step(self, a_t):
+    def step(self, a_t, auto_reset=True):
         t = self._ep_steps_so_far + 1
         s_t = self._state
         r_t_mu = self._reward_means[s_t, a_t]
@@ -54,6 +54,8 @@ class MDPEnv:
         s_tp1 = np.random.choice(
             a=self._num_states, p=s_tp1_probs)[0]
         done_t = False if t < self._max_ep_length else True
+        if done_t and auto_reset:
+            s_tp1 = self.reset()
         return s_tp1, r_t, done_t, {}
 
     def reset(self):
