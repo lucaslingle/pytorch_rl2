@@ -103,7 +103,7 @@ def generate_meta_episode(
             h_tm1_policy_net = h_t_policy_net
             h_tm1_value_net = h_t_value_net
             a_tm1 = np.array([meta_episode.acs[t]])
-            r_tm1 = np.array([meta_episode.dones[t]])
+            r_tm1 = np.array([meta_episode.rews[t]])
             d_tm1 = np.array([meta_episode.dones[t]])
             o_t = o_tp1
 
