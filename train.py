@@ -143,7 +143,7 @@ def credit_assignment(
         A_t = delta_t + gamma * lam * A_tp1
         meta_episode.advs[t-1] = A_t
 
-    meta_episode.tdlam_rets[:] = meta_episode.vpreds[0:-1] + meta_episode.advs
+    meta_episode.tdlam_rets[:] = meta_episode.vpreds + meta_episode.advs
     return meta_episode
 
 
@@ -275,8 +275,8 @@ def training_loop(
         ppo_opt_epochs: int,
         ppo_clip_param: float,
         ppo_ent_coef: float,
-        max_pol_steps: int,
-        pol_steps_so_far: int,
+        max_pol_iters: int,
+        pol_iters_so_far: int,
         policy_checkpoint_fn: Callable[[int], None],
         value_checkpoint_fn: Callable[[int], None]
     ) -> None:
@@ -311,7 +311,7 @@ def training_loop(
     comm = get_comm()
     meta_ep_returns = deque(maxlen=1000)
 
-    for pol_step in range(pol_steps_so_far, max_pol_steps):
+    for pol_iter in range(pol_iters_so_far, max_pol_iters):
 
         # collect meta-episodes...
         meta_episodes = list()
@@ -331,6 +331,7 @@ def training_loop(
             g_meta_ep_returns = [x for loc in g_meta_ep_returns for x in loc]
             meta_ep_returns.extend(g_meta_ep_returns)
 
+        # policy update...
         for opt_epoch in range(ppo_opt_epochs):
             idxs = np.random.permutation(meta_episodes_per_policy_update)
             for i in range(0, meta_episodes_per_policy_update, meta_episodes_per_actor_batch):
@@ -364,43 +365,38 @@ def training_loop(
                 global_losses[name] = loss_avg
 
             if comm.Get_rank() == ROOT_RANK:
-                print(f"pol iter {pol_step}, opt_epoch: {opt_epoch}...")
+                print(f"pol update {pol_iter}, opt_epoch: {opt_epoch}...")
                 for name, value in global_losses.items():
                     print(f"\t{name}: {value:>0.6f}")
 
+        # misc.: print metrics, save checkpoint.
         if comm.Get_rank() == ROOT_RANK:
             print("-" * 100)
             print(f"mean meta-episode return: {np.mean(meta_ep_returns)}")
             print("-" * 100)
-
-        # maybe checkpoint.
-        if True:
-            if comm.Get_rank() == 0:
-                policy_checkpoint_fn(pol_step)
-                value_checkpoint_fn(pol_step)
+            policy_checkpoint_fn(pol_iter)
+            value_checkpoint_fn(pol_iter)
 
 
 def create_argparser():
     parser = argparse.ArgumentParser(
         description="""Training script.""")
-    parser.add_argument("--max_policy_iterations", type=int, default=1000)
+    parser.add_argument("--max_pol_iters", type=int, default=1000)
     parser.add_argument("--num_states", type=int, default=10)
     parser.add_argument("--num_actions", type=int, default=5)
     parser.add_argument("--model_name", type=str, default='defaults')
     parser.add_argument("--checkpoint_dir", type=str, default='checkpoints')
     parser.add_argument("--checkpoint_interval", type=int, default=10)
-    parser.add_argument("--traj_seg_length", type=int, default=10)
-    parser.add_argument("--optim_epochs", type=int, default=4)
-    parser.add_argument("--optim_nseg_per_actor", type=int, default=30000//10)
-    parser.add_argument("--optim_nseg_per_gradstep", type=int, default=60)
-    parser.add_argument("--optim_stepsize", type=float, default=1e-4)
+    parser.add_argument("--episode_len", type=int, default=10)
+    parser.add_argument("--ppo_opt_epochs", type=int, default=4)
+    parser.add_argument("--meta_episodes_per_policy_update", type=int, default=30000//10)
+    parser.add_argument("--meta_episodes_per_actor_batch", type=int, default=60)
+    parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--lam", type=float, default=0.3)
-    parser.add_argument("--clip_param", type=float, default=0.10)
-    parser.add_argument("--ent_coef", type=float, default=0.01)
-    parser.add_argument("--monitoring_dir", type=str, default='monitoring')
-    parser.add_argument("--asset_dir", type=str, default='assets')
-    parser.add_argument("--experiment_seed", type=int, default=0)
+    parser.add_argument("--ppo_clip_param", type=float, default=0.10)
+    parser.add_argument("--ppo_ent_coef", type=float, default=0.01)
+    parser.add_argument("--experiment_seed", type=int, default=0) # not yet used
     return parser
 
 
@@ -411,7 +407,7 @@ def main():
     env = MDPEnv(
         num_states=args.num_states,
         num_actions=args.num_actions,
-        max_ep_length=10)
+        max_ep_length=args.episode_len)
 
     policy_net = PolicyNetworkMDP(
         num_states=args.num_states,
@@ -434,9 +430,9 @@ def main():
 
     # load checkpoint, if applicable.
     comm = get_comm()
-    pol_steps_so_far = 0
+    pol_iters_so_far = 0
     if comm.Get_rank() == 0:
-        steps_policy = maybe_load_checkpoint(
+        a = maybe_load_checkpoint(
             checkpoint_dir=args.checkpoint_dir,
             model_name=f"{args.model_name}/policy_net",
             model=policy_net,
@@ -444,7 +440,7 @@ def main():
             scheduler=policy_scheduler,
             steps=None)
 
-        steps_value = maybe_load_checkpoint(
+        b = maybe_load_checkpoint(
             checkpoint_dir=args.checkpoint_dir,
             model_name=f"{args.model_name}/value_net",
             model=value_net,
@@ -452,13 +448,13 @@ def main():
             scheduler=value_scheduler,
             steps=None)
 
-        if steps_policy != steps_value:
+        if a != b:
             raise RuntimeError(
-                "Policy steps not equal to value steps in latest checkpoint!")
-        pol_steps_so_far = steps_policy
+                "Policy and value iterates not aligned in latest checkpoint!")
+        pol_iters_so_far = a
 
     # sync state.
-    pol_steps_so_far = comm.bcast(pol_steps_so_far, root=ROOT_RANK)
+    pol_iters_so_far = comm.bcast(pol_iters_so_far, root=ROOT_RANK)
     sync_state(
         model=policy_net,
         optimizer=policy_optimizer,
@@ -505,8 +501,8 @@ def main():
         ppo_opt_epochs=args.ppo_opt_epochs,
         ppo_clip_param=args.ppo_clip_param,
         ppo_ent_coef=args.ppo_ent_coef,
-        max_pol_steps=args.max_pol_steps,
-        pol_steps_so_far=pol_steps_so_far,
+        max_pol_iters=args.max_pol_iters,
+        pol_iters_so_far=pol_iters_so_far,
         policy_checkpoint_fn=policy_checkpoint_fn,
         value_checkpoint_fn=value_checkpoint_fn)
 
