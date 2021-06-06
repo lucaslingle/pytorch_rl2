@@ -307,7 +307,7 @@ def training_loop(
         ppo_opt_epochs: optimization epochs for proximal policy optimization.
         ppo_clip_param: clip parameter for proximal policy optimization.
         ppo_ent_coef: entropy bonus coefficient for proximal policy optimization
-        max_pol_iters: max number of policy improvements to do.
+        max_pol_iters: max number of policy improvements.
         pol_iters_so_far: number of policy improvements so far.
         policy_checkpoint_fn: a callback for saving checkpoints of policy net.
         value_checkpoint_fn: a callback for saving checkpoints of value net.
