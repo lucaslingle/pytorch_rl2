@@ -5,7 +5,7 @@ Implements MDP meta-reinforcement learning agent proposed by Duan et al., 2016
 
 import torch as tc
 
-from rl2.agents.common import WeightNormedLinear, ValueHead, PolicyHead
+from rl2.agents.common import WeightNormedLinear, ValueHead, PolicyHead, one_hot
 
 
 class TabularMDP_GRU(tc.nn.Module):
@@ -19,13 +19,6 @@ class TabularMDP_GRU(tc.nn.Module):
         self._emb_dim = feature_dim
         self._input_dim = 2 * self._emb_dim + 2
         self._hidden_dim = feature_dim
-
-        self._state_emb = tc.nn.Embedding(
-            num_embeddings=self._num_states,
-            embedding_dim=self._emb_dim)
-        self._action_emb = tc.nn.Embedding(
-            num_embeddings=self._num_actions,
-            embedding_dim=self._emb_dim)
 
         self._x2z = WeightNormedLinear(
             input_dim=self._input_dim,
@@ -80,8 +73,8 @@ class TabularMDP_GRU(tc.nn.Module):
         Returns:
             new_state.
         """
-        emb_o = self._state_emb(curr_obs)
-        emb_a = self._action_emb(prev_action)
+        emb_o = one_hot(curr_obs, depth=self._num_states)
+        emb_a = one_hot(prev_action, depth=self._num_actions)
         prev_reward = prev_reward.unsqueeze(-1)
         prev_done = prev_done.unsqueeze(-1)
         in_vec = tc.cat((emb_o, emb_a, prev_reward, prev_done), dim=-1)

@@ -68,3 +68,24 @@ class ValueHead(tc.nn.Module):
     def forward(self, features):  # pylint: disable=C0116
         v_pred = self.linear(features).squeeze(-1)
         return v_pred
+
+
+def one_hot(ys, depth):
+    """
+    Applies one-hot encoding to a batch of vectors.
+
+    Args:
+        ys: tc.LongTensor of shape [B].
+        depth: int specifying the number of possible label values.
+
+    Returns:
+        one-hot encodings of labels
+    """
+
+    batch_size = ys.shape[0]
+    vecs_shape = [batch_size, depth]
+    vecs = tc.zeros(dtype=tc.float32, size=vecs_shape)
+    vecs.scatter_(dim=1, index=ys.unsqueeze(-1),
+                  src=tc.ones(dtype=tc.float32, size=vecs_shape))
+    return vecs
+
