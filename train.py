@@ -195,9 +195,10 @@ def compute_losses(
     h_tm1_policy_net = policy_net.initial_state(batch_size=B)
     h_tm1_value_net = value_net.initial_state(batch_size=B)
 
-    entropies = []
-    logpacs_new = []
-    vpreds_new = []
+    entropies = list()
+    logpacs_new = list()
+    vpreds_new = list()
+
     while t < T+1:
         pi_dist_t, h_t_policy_net = policy_net(
             curr_obs=o_t,
