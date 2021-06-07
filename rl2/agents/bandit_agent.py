@@ -5,7 +5,7 @@ Implements MAB meta-reinforcement learning agent proposed by Duan et al., 2016
 
 import torch as tc
 
-from rl2.agents.common import WeightNormedLinear, ValueHead, PolicyHead
+from rl2.agents.common import WeightNormedLinear, ValueHead, PolicyHead, one_hot
 
 
 class BanditGRU(tc.nn.Module):
@@ -16,12 +16,8 @@ class BanditGRU(tc.nn.Module):
         super().__init__()
         self._num_actions = num_actions
         self._emb_dim = feature_dim
-        self._input_dim = self._emb_dim + 2
+        self._input_dim = self._num_actions + 2
         self._hidden_dim = feature_dim
-
-        self._emb = tc.nn.Embedding(
-            num_embeddings=self._num_actions,
-            embedding_dim=self._emb_dim)
 
         self._x2z = WeightNormedLinear(
             input_dim=self._input_dim,
@@ -68,7 +64,7 @@ class BanditGRU(tc.nn.Module):
         Returns:
             new_state.
         """
-        emb_a = self._emb(prev_action)
+        emb_a = one_hot(prev_action, depth=self._num_actions)
         prev_reward = prev_reward.unsqueeze(-1)
         prev_done = prev_done.unsqueeze(-1)
         in_vec = tc.cat((emb_a, prev_reward, prev_done), dim=-1)

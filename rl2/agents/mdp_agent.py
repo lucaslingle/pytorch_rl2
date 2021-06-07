@@ -16,8 +16,7 @@ class TabularMDP_GRU(tc.nn.Module):
         super().__init__()
         self._num_states = num_states
         self._num_actions = num_actions
-        self._emb_dim = feature_dim
-        self._input_dim = 2 * self._emb_dim + 2
+        self._input_dim = self._num_states + self._num_actions + 2
         self._hidden_dim = feature_dim
 
         self._x2z = WeightNormedLinear(
