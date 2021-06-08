@@ -333,7 +333,7 @@ def training_loop(
                 value_net=value_net,
                 episode_len=episode_len,
                 num_episodes=episodes_per_meta_episode)
-            meta_episode = assign_credit(meta_episode, gamma=gamma, lam=lam)
+            meta_episode = assign_credit(meta_episode, gamma, lam)
             meta_episodes.append(meta_episode)
 
             # logging
@@ -514,6 +514,8 @@ def main():
         ppo_opt_epochs=args.ppo_opt_epochs,
         ppo_clip_param=args.ppo_clip_param,
         ppo_ent_coef=args.ppo_ent_coef,
+        gamma=args.gamma,
+        lam=args.lam,
         max_pol_iters=args.max_pol_iters,
         pol_iters_so_far=pol_iters_so_far,
         policy_checkpoint_fn=policy_checkpoint_fn,
