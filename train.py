@@ -334,7 +334,9 @@ def training_loop(
                 episode_len=episode_len,
                 num_episodes=episodes_per_meta_episode)
             meta_episode = assign_credit(
-                meta_episode=meta_episode, gamma=discount_gamma, lam=gae_lambda)
+                meta_episode=meta_episode,
+                gamma=discount_gamma,
+                lam=gae_lambda)
             meta_episodes.append(meta_episode)
 
             # logging
