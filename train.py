@@ -281,8 +281,8 @@ def training_loop(
         ppo_opt_epochs: int,
         ppo_clip_param: float,
         ppo_ent_coef: float,
-        gamma: float,
-        lam: float,
+        discount_gamma: float,
+        gae_lambda: float,
         max_pol_iters: int,
         pol_iters_so_far: int,
         policy_checkpoint_fn: Callable[[int], None],
@@ -308,8 +308,8 @@ def training_loop(
         ppo_opt_epochs: optimization epochs for proximal policy optimization.
         ppo_clip_param: clip parameter for proximal policy optimization.
         ppo_ent_coef: entropy bonus coefficient for proximal policy optimization
-        gamma: discount factor gamma.
-        lam: decay parameter lambda for generalized advantage estimation.
+        discount_gamma: discount factor gamma.
+        gae_lambda: decay parameter lambda for generalized advantage estimation.
         max_pol_iters: the maximum number policy improvements to make.
         pol_iters_so_far: the number of policy improvements made so far.
         policy_checkpoint_fn: a callback for saving checkpoints of policy net.
@@ -333,7 +333,8 @@ def training_loop(
                 value_net=value_net,
                 episode_len=episode_len,
                 num_episodes=episodes_per_meta_episode)
-            meta_episode = assign_credit(meta_episode, gamma, lam)
+            meta_episode = assign_credit(
+                meta_episode=meta_episode, gamma=discount_gamma, lam=gae_lambda)
             meta_episodes.append(meta_episode)
 
             # logging
@@ -404,9 +405,10 @@ def create_argparser():
     parser.add_argument("--ppo_opt_epochs", type=int, default=4)
     parser.add_argument("--meta_episodes_per_policy_update", type=int, default=30000//10)
     parser.add_argument("--meta_episodes_per_actor_batch", type=int, default=60)
-    parser.add_argument("--lr", type=float, default=1e-4)
-    parser.add_argument("--gamma", type=float, default=0.99)
-    parser.add_argument("--lam", type=float, default=0.3)
+    parser.add_argument("--adam_lr", type=float, default=1e-4)
+    parser.add_argument("--adam_eps", type=float, default=1e-5)
+    parser.add_argument("--discount_gamma", type=float, default=0.99)
+    parser.add_argument("--gae_lambda", type=float, default=0.3)
     parser.add_argument("--ppo_clip_param", type=float, default=0.10)
     parser.add_argument("--ppo_ent_coef", type=float, default=0.01)
     parser.add_argument("--experiment_seed", type=int, default=0) # not yet used
@@ -431,12 +433,12 @@ def main():
 
     policy_optimizer = tc.optim.Adam(
         params=policy_net.parameters(),
-        lr=args.lr,
-        eps=1e-5)
+        lr=args.adam_lr,
+        eps=args.adam_eps)
     value_optimizer = tc.optim.Adam(
         params=value_net.parameters(),
-        lr=args.lr,
-        eps=1e-5)
+        lr=args.adam_lr,
+        eps=args.adam_eps)
 
     policy_scheduler = None
     value_scheduler = None
@@ -514,8 +516,8 @@ def main():
         ppo_opt_epochs=args.ppo_opt_epochs,
         ppo_clip_param=args.ppo_clip_param,
         ppo_ent_coef=args.ppo_ent_coef,
-        gamma=args.gamma,
-        lam=args.lam,
+        discount_gamma=args.discount_gamma,
+        gae_lambda=args.gae_lambda,
         max_pol_iters=args.max_pol_iters,
         pol_iters_so_far=pol_iters_so_far,
         policy_checkpoint_fn=policy_checkpoint_fn,
