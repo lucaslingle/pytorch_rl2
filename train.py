@@ -135,7 +135,7 @@ def assign_credit(
 
     Returns:
         meta_episode: an instance of the meta-episode class,
-        with updated advantage estimates and td lambda returns computed.
+        with advantage estimates and td lambda returns computed.
     """
     T = len(meta_episode.acs)
     for t in reversed(range(1, T+1)):  # T, ..., 1.
