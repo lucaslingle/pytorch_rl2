@@ -59,7 +59,7 @@ def generate_meta_episode(
         num_episodes: episodes per meta-episode.
 
     Returns:
-        meta_episode: an instance of the meta-episode dataclass.
+        meta_episode: an instance of the meta-episode class.
     """
 
     env.new_env()
@@ -409,7 +409,7 @@ def create_argparser():
     parser.add_argument("--checkpoint_interval", type=int, default=10)
     parser.add_argument("--episode_len", type=int, default=10)
     parser.add_argument("--episodes_per_meta_episode", type=int, default=10)
-    parser.add_argument("--meta_episodes_per_policy_update", type=int, default=30000//10)
+    parser.add_argument("--meta_episodes_per_policy_update", type=int, default=30000//100)
     parser.add_argument("--meta_episodes_per_actor_batch", type=int, default=60)
     parser.add_argument("--ppo_opt_epochs", type=int, default=4)
     parser.add_argument("--ppo_clip_param", type=float, default=0.10)
