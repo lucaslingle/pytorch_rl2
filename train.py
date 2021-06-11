@@ -429,10 +429,9 @@ def create_env(mode, num_states, num_actions, episode_len):
             num_actions=num_actions,
             max_ep_length=episode_len)
         return env
-    else:
-        env = BanditEnv(
-            num_actions=num_actions)
-        return env
+
+    env = BanditEnv(num_actions=num_actions)
+    return env
 
 
 def create_agent(mode, num_states, num_actions):
@@ -442,10 +441,10 @@ def create_agent(mode, num_states, num_actions):
         value_net = ValueNetworkMDP(
             num_states=num_states, num_actions=num_actions)
         return policy_net, value_net
-    else:
-        policy_net = PolicyNetworkMAB(num_actions=num_actions)
-        value_net = ValueNetworkMAB(num_actions=num_actions)
-        return policy_net, value_net
+
+    policy_net = PolicyNetworkMAB(num_actions=num_actions)
+    value_net = ValueNetworkMAB(num_actions=num_actions)
+    return policy_net, value_net
 
 
 def main():
