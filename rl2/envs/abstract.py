@@ -2,14 +2,14 @@
 Implements abstract class for meta-reinforcement learning environments.
 """
 
-from typing import Tuple, TypeVar
+from typing import Generic, TypeVar, Tuple
 import abc
 
 
 ObsType = TypeVar('ObsType')
 
 
-class MetaEpisodicEnv(abc.ABC):
+class MetaEpisodicEnv(abc.ABC, Generic[ObsType]):
     @abc.abstractmethod
     def new_env(self) -> None:
         """
