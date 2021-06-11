@@ -182,7 +182,7 @@ class ValueNetworkMAB(StatefulValueNet):
         prev_state: tc.FloatTensor
     ) -> Tuple[tc.FloatTensor, tc.FloatTensor]:
         """
-        Runs recurrent state update and returns policy dist and new state.
+        Runs recurrent state update and returns value estimate and new state.
 
         Args:
             curr_obs: current timestep observation as tc.LongTensor w/ shape [B]
@@ -192,8 +192,8 @@ class ValueNetworkMAB(StatefulValueNet):
             prev_state: prev hidden state w/ shape [B, H].
 
         Returns:
-            A tuple containing the parametrized policy's action distribution
-              and the new state of the stateful policy.
+            A tuple containing the parametrized value function's value estimate
+              and the new state of the stateful value function.
         """
         new_state = self._memory(
             prev_action=prev_action,
