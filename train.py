@@ -4,7 +4,6 @@ Implements training loop for the MDP agent from Duan et al., 2016
 """
 
 from typing import List, Dict, Optional, Callable
-from dataclasses import dataclass
 from collections import deque
 from functools import partial
 import argparse
@@ -13,14 +12,19 @@ import torch as tc
 import numpy as np
 from mpi4py import MPI
 
+from rl2.envs.abstract import MetaEpisodicEnv
+from rl2.envs.bandit_env import BanditEnv
 from rl2.envs.mdp_env import MDPEnv
+
+from rl2.agents.abstract import StatefulPolicyNet, StatefulValueNet
+from rl2.agents.bandit_agent import PolicyNetworkMAB, ValueNetworkMAB
 from rl2.agents.mdp_agent import PolicyNetworkMDP, ValueNetworkMDP
+
 from rl2.utils.comm_util import get_comm, sync_state, sync_grads
 from rl2.utils.checkpoint_util import maybe_load_checkpoint, save_checkpoint
 from rl2.utils.constants import ROOT_RANK
 
 
-@dataclass
 class MetaEpisode:
     def __init__(self, episode_len, num_episodes, dummy_obs):
         self.horizon = episode_len * num_episodes
@@ -36,9 +40,9 @@ class MetaEpisode:
 
 @tc.no_grad()
 def generate_meta_episode(
-        env: MDPEnv,
-        policy_net: PolicyNetworkMDP,
-        value_net: ValueNetworkMDP,
+        env: MetaEpisodicEnv,
+        policy_net: StatefulPolicyNet,
+        value_net: StatefulValueNet,
         episode_len: int,
         num_episodes: int
     ) -> MetaEpisode:
@@ -58,7 +62,7 @@ def generate_meta_episode(
         meta_episode: an instance of the meta-episode dataclass.
     """
 
-    env.new_mdp()
+    env.new_env()
     t = 0
     o_t = env.reset()
     a_tm1 = np.array([0])
@@ -149,8 +153,8 @@ def assign_credit(
 
 def compute_losses(
         meta_episodes: List[MetaEpisode],
-        policy_net: PolicyNetworkMDP,
-        value_net: ValueNetworkMDP,
+        policy_net: StatefulPolicyNet,
+        value_net: StatefulValueNet,
         clip_param: float,
         ent_coef: float
     ) -> Dict[str, tc.Tensor]:
@@ -267,9 +271,9 @@ def compute_losses(
 
 
 def training_loop(
-        env: MDPEnv,
-        policy_net: PolicyNetworkMDP,
-        value_net: ValueNetworkMDP,
+        env: MetaEpisodicEnv,
+        policy_net: StatefulPolicyNet,
+        value_net: StatefulValueNet,
         policy_optimizer: tc.optim.Optimizer,
         value_optimizer: tc.optim.Optimizer,
         policy_scheduler: Optional[tc.optim.lr_scheduler._LRScheduler],  # pylint: disable=W0212
@@ -396,6 +400,7 @@ def training_loop(
 def create_argparser():
     parser = argparse.ArgumentParser(
         description="""Training script.""")
+    parser.add_argument("--mode", choice=['mdp', 'bandit'], default='mdp')
     parser.add_argument("--max_pol_iters", type=int, default=1000)
     parser.add_argument("--num_states", type=int, default=10)
     parser.add_argument("--num_actions", type=int, default=5)
@@ -412,7 +417,7 @@ def create_argparser():
     parser.add_argument("--discount_gamma", type=float, default=0.99)
     parser.add_argument("--gae_lambda", type=float, default=0.3)
     parser.add_argument("--adam_lr", type=float, default=1e-4)
-    parser.add_argument("--adam_eps", type=float, default=1e-5)
+    parser.add_argument("--adam_eps", type=float, default=1e-3)
     parser.add_argument("--experiment_seed", type=int, default=0) # not yet used
     return parser
 
@@ -421,15 +426,18 @@ def main():
     args = create_argparser().parse_args()
 
     # create env and learning system.
-    env = MDPEnv(
+    env_cls = MDPEnv if args.mode == 'mdp' else BanditEnv
+    env = env_cls(
         num_states=args.num_states,
         num_actions=args.num_actions,
         max_ep_length=args.episode_len)
 
-    policy_net = PolicyNetworkMDP(
+    policy_cls = PolicyNetworkMDP if args.mode == 'mdp' else PolicyNetworkMAB
+    policy_net = policy_cls(
         num_states=args.num_states,
         num_actions=args.num_actions)
-    value_net = ValueNetworkMDP(
+    value_cls = ValueNetworkMDP if args.mode == 'mdp' else ValueNetworkMAB
+    value_net = value_cls(
         num_states=args.num_states,
         num_actions=args.num_actions)
 

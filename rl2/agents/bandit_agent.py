@@ -3,9 +3,13 @@ Implements MAB meta-reinforcement learning agent proposed by Duan et al., 2016
 - 'RL^2 : Fast Reinforcement Learning via Slow Reinforcement Learning'.
 """
 
+from typing import Tuple
+
 import torch as tc
 
-from rl2.agents.common import WeightNormedLinear, ValueHead, PolicyHead, one_hot
+from rl2.agents.abstract import StatefulPolicyNet, StatefulValueNet
+from rl2.agents.common import WeightNormedLinear, one_hot
+from rl2.agents.common import PolicyHead, ValueHead
 
 
 class BanditGRU(tc.nn.Module):
@@ -78,31 +82,7 @@ class BanditGRU(tc.nn.Module):
         return new_state
 
 
-class ValueNetworkMAB(tc.nn.Module):
-    """
-    Value network from Duan et al., 2016 for multi-armed bandit problems.
-    """
-    def __init__(self, num_actions):
-        super().__init__()
-        self._num_actions = num_actions
-        self._feature_dim = 256
-        self._initial_state = tc.zeros(self._feature_dim)
-        self._memory = BanditGRU(
-            num_actions=self._num_actions,
-            feature_dim=self._feature_dim)
-        self._value_head = ValueHead(
-            feature_dim=self._feature_dim)
-
-    def initial_state(self, batch_size):  # pylint: disable=C0116
-        return self._initial_state.unsqueeze(0).repeat(batch_size, 1)
-
-    def forward(self, prev_action, prev_reward, prev_done, prev_state):  # pylint: disable=C0116
-        new_state = self._memory(prev_action, prev_reward, prev_done, prev_state)
-        v_pred = self._value_head(new_state)
-        return v_pred, new_state
-
-
-class PolicyNetworkMAB(tc.nn.Module):
+class PolicyNetworkMAB(StatefulPolicyNet):
     """
     Policy network from Duan et al., 2016 for multi-armed bandit problems.
     """
@@ -111,6 +91,7 @@ class PolicyNetworkMAB(tc.nn.Module):
         self._num_actions = num_actions
         self._feature_dim = 256
         self._initial_state = tc.zeros(self._feature_dim)
+
         self._memory = BanditGRU(
             num_actions=self._num_actions,
             feature_dim=self._feature_dim)
@@ -118,10 +99,107 @@ class PolicyNetworkMAB(tc.nn.Module):
             num_actions=self._num_actions,
             feature_dim=self._feature_dim)
 
-    def initial_state(self, batch_size):  # pylint: disable=C0116
+    def initial_state(self, batch_size: int) -> tc.FloatTensor:
+        """
+        Return initial state of zeros.
+
+        Args:
+            batch_size: batch size to tile the initial state by.
+
+        Returns:
+            initial_state FloatTensor.
+        """
         return self._initial_state.unsqueeze(0).repeat(batch_size, 1)
 
-    def forward(self, prev_action, prev_reward, prev_done, prev_state):  # pylint: disable=C0116
-        new_state = self._memory(prev_action, prev_reward, prev_done, prev_state)
-        pi_dist = self._policy_head(new_state)
+    def forward(
+        self,
+        curr_obs: tc.LongTensor,
+        prev_action: tc.LongTensor,
+        prev_reward: tc.FloatTensor,
+        prev_done: tc.FloatTensor,
+        prev_state: tc.FloatTensor
+    ) -> Tuple[tc.distributions.Categorical, tc.FloatTensor]:
+        """
+        Run recurrent state update and return policy distribution and new state.
+
+        Args:
+            curr_obs: current timestep observation as tc.LongTensor w/ shape [B]
+            prev_action: prev timestep action as tc.LongTensor w/ shape [B]
+            prev_reward: prev timestep reward as tc.FloatTensor w/ shape [B]
+            prev_done: prev timestep done flag as tc.FloatTensor w/ shape [B]
+            prev_state: prev hidden state w/ shape [B, H].
+
+        Returns:
+            new_state.
+        """
+        new_state = self._memory(
+            prev_action=prev_action,
+            prev_reward=prev_reward,
+            prev_done=prev_done,
+            prev_state=prev_state)
+
+        pi_dist = self._policy_head(
+            features=new_state)
+
         return pi_dist, new_state
+
+
+class ValueNetworkMAB(StatefulValueNet):
+    """
+    Value network from Duan et al., 2016 for multi-armed bandit problems.
+    """
+    def __init__(self, num_actions):
+        super().__init__()
+        self._num_actions = num_actions
+        self._feature_dim = 256
+        self._initial_state = tc.zeros(self._feature_dim)
+
+        self._memory = BanditGRU(
+            num_actions=self._num_actions,
+            feature_dim=self._feature_dim)
+        self._value_head = ValueHead(
+            feature_dim=self._feature_dim)
+
+    def initial_state(self, batch_size: int) -> tc.FloatTensor:
+        """
+        Return initial state of zeros.
+
+        Args:
+            batch_size: batch size to tile the initial state by.
+
+        Returns:
+            initial_state FloatTensor.
+        """
+        return self._initial_state.unsqueeze(0).repeat(batch_size, 1)
+
+    def forward(
+        self,
+        curr_obs: tc.LongTensor,
+        prev_action: tc.LongTensor,
+        prev_reward: tc.FloatTensor,
+        prev_done: tc.FloatTensor,
+        prev_state: tc.FloatTensor
+    ) -> Tuple[tc.distributions.Categorical, tc.FloatTensor]:
+        """
+        Run recurrent state update and return value estimate and new state.
+
+        Args:
+            curr_obs: current timestep observation as tc.LongTensor w/ shape [B]
+            prev_action: prev timestep action as tc.LongTensor w/ shape [B]
+            prev_reward: prev timestep reward as tc.FloatTensor w/ shape [B]
+            prev_done: prev timestep done flag as tc.FloatTensor w/ shape [B]
+            prev_state: prev hidden state w/ shape [B, H].
+
+        Returns:
+            new_state.
+        """
+        new_state = self._memory(
+            prev_action=prev_action,
+            prev_reward=prev_reward,
+            prev_done=prev_done,
+            prev_state=prev_state)
+
+        v_pred = self._value_head(
+            features=new_state)
+
+        return v_pred, new_state

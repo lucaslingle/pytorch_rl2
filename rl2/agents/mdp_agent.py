@@ -3,12 +3,16 @@ Implements MDP meta-reinforcement learning agent proposed by Duan et al., 2016
 - 'RL^2 : Fast Reinforcement Learning via Slow Reinforcement Learning'.
 """
 
+from typing import Tuple
+
 import torch as tc
 
-from rl2.agents.common import WeightNormedLinear, ValueHead, PolicyHead, one_hot
+from rl2.agents.abstract import StatefulPolicyNet, StatefulValueNet
+from rl2.agents.common import WeightNormedLinear, one_hot
+from rl2.agents.common import PolicyHead, ValueHead
 
 
-class TabularMDP_GRU(tc.nn.Module):
+class TabularMarkovDecisionProcessGRU(tc.nn.Module):
     """
     Tabular MDP GRU from Duan et al., 2016.
     """
@@ -53,17 +57,18 @@ class TabularMDP_GRU(tc.nn.Module):
             bias_initializer=tc.nn.init.zeros_)
 
     def forward(
-            self,
-            curr_obs,
-            prev_action,
-            prev_reward,
-            prev_done,
-            prev_state
-    ):
+        self,
+        curr_obs: tc.LongTensor,
+        prev_action: tc.LongTensor,
+        prev_reward: tc.FloatTensor,
+        prev_done: tc.FloatTensor,
+        prev_state: tc.FloatTensor
+    ) -> tc.FloatTensor:
         """
-        Run recurrent state update and return new state.
+        Run recurrent state update.
         Args:
-            curr_obs: current timestep state as tc.LongTensor w/ shape [B]
+            curr_obs: current timestep observation as tc.LongTensor
+                or tc.FloatTensor with shape [B].
             prev_action: prev timestep action as tc.LongTensor w/ shape [B]
             prev_reward: prev timestep rew as tc.FloatTensor w/ shape [B]
             prev_done: prev timestep done flag as tc.FloatTensor w/ shape [B]
@@ -87,45 +92,7 @@ class TabularMDP_GRU(tc.nn.Module):
         return new_state
 
 
-class ValueNetworkMDP(tc.nn.Module):
-    """
-    Value network from Duan et al., 2016 for MDPs.
-    """
-    def __init__(self, num_states, num_actions):
-        super().__init__()
-        self._num_states = num_states
-        self._num_actions = num_actions
-        self._feature_dim = 256
-        self._initial_state = tc.zeros(self._feature_dim)
-        self._memory = TabularMDP_GRU(
-            num_states=self._num_states,
-            num_actions=self._num_actions,
-            feature_dim=self._feature_dim)
-        self._value_head = ValueHead(
-            feature_dim=self._feature_dim)
-
-    def initial_state(self, batch_size):  # pylint: disable=C0116
-        return self._initial_state.unsqueeze(0).repeat(batch_size, 1)
-
-    def forward(
-        self,
-        curr_obs,
-        prev_action,
-        prev_reward,
-        prev_done,
-        prev_state
-    ):  # pylint: disable=C0116
-        new_state = self._memory(
-            curr_obs=curr_obs,
-            prev_action=prev_action,
-            prev_reward=prev_reward,
-            prev_done=prev_done,
-            prev_state=prev_state)
-        v_pred = self._value_head(new_state)
-        return v_pred, new_state
-
-
-class PolicyNetworkMDP(tc.nn.Module):
+class PolicyNetworkMDP(StatefulPolicyNet):
     """
     Policy network from Duan et al., 2016 for MDPs.
     """
@@ -135,30 +102,122 @@ class PolicyNetworkMDP(tc.nn.Module):
         self._num_actions = num_actions
         self._feature_dim = 256
         self._initial_state = tc.zeros(self._feature_dim)
-        self._memory = TabularMDP_GRU(
+
+        self._memory = TabularMarkovDecisionProcessGRU(
             num_states=self._num_states,
             num_actions=self._num_actions,
             feature_dim=self._feature_dim)
+
         self._policy_head = PolicyHead(
             num_actions=self._num_actions,
             feature_dim=self._feature_dim)
 
-    def initial_state(self, batch_size):  # pylint: disable=C0116
+    def initial_state(self, batch_size: int) -> tc.FloatTensor:
+        """
+        Return initial state of zeros.
+
+        Args:
+            batch_size: batch size to tile the initial state by.
+
+        Returns:
+            initial_state FloatTensor.
+        """
         return self._initial_state.unsqueeze(0).repeat(batch_size, 1)
 
     def forward(
         self,
-        curr_obs,
-        prev_action,
-        prev_reward,
-        prev_done,
-        prev_state
-    ):  # pylint: disable=C0116
+        curr_obs: tc.LongTensor,
+        prev_action: tc.LongTensor,
+        prev_reward: tc.FloatTensor,
+        prev_done: tc.FloatTensor,
+        prev_state: tc.FloatTensor
+    ) -> Tuple[tc.distributions.Categorical, tc.FloatTensor]:
+        """
+        Run recurrent state update and return policy distribution and new state.
+
+        Args:
+            curr_obs: current timestep observation as tc.LongTensor w/ shape [B]
+            prev_action: prev timestep action as tc.LongTensor w/ shape [B]
+            prev_reward: prev timestep reward as tc.FloatTensor w/ shape [B]
+            prev_done: prev timestep done flag as tc.FloatTensor w/ shape [B]
+            prev_state: prev hidden state w/ shape [B, H].
+
+        Returns:
+            new_state.
+        """
         new_state = self._memory(
             curr_obs=curr_obs,
             prev_action=prev_action,
             prev_reward=prev_reward,
             prev_done=prev_done,
             prev_state=prev_state)
-        pi_dist = self._policy_head(new_state)
+
+        pi_dist = self._policy_head(
+            features=new_state)
+
         return pi_dist, new_state
+
+
+class ValueNetworkMDP(StatefulValueNet):
+    """
+    Value network from Duan et al., 2016 for MDPs.
+    """
+    def __init__(self, num_states, num_actions):
+        super().__init__()
+        self._num_states = num_states
+        self._num_actions = num_actions
+        self._feature_dim = 256
+        self._initial_state = tc.zeros(self._feature_dim)
+
+        self._memory = TabularMarkovDecisionProcessGRU(
+            num_states=self._num_states,
+            num_actions=self._num_actions,
+            feature_dim=self._feature_dim)
+
+        self._value_head = ValueHead(
+            feature_dim=self._feature_dim)
+
+    def initial_state(self, batch_size: int) -> tc.FloatTensor:
+        """
+        Return initial state of zeros.
+
+        Args:
+            batch_size: batch size to tile the initial state by.
+
+        Returns:
+            initial_state FloatTensor.
+        """
+        return self._initial_state.unsqueeze(0).repeat(batch_size, 1)
+
+    def forward(
+            self,
+            curr_obs: tc.LongTensor,
+            prev_action: tc.LongTensor,
+            prev_reward: tc.FloatTensor,
+            prev_done: tc.FloatTensor,
+            prev_state: tc.FloatTensor
+    ) -> Tuple[tc.distributions.Categorical, tc.FloatTensor]:
+        """
+        Run recurrent state update and return value estimate and new state.
+
+        Args:
+            curr_obs: current timestep observation as tc.LongTensor w/ shape [B]
+            prev_action: prev timestep action as tc.LongTensor w/ shape [B]
+            prev_reward: prev timestep reward as tc.FloatTensor w/ shape [B]
+            prev_done: prev timestep done flag as tc.FloatTensor w/ shape [B]
+            prev_state: prev hidden state w/ shape [B, H].
+
+        Returns:
+            new_state.
+        """
+        new_state = self._memory(
+            curr_obs=curr_obs,
+            prev_action=prev_action,
+            prev_reward=prev_reward,
+            prev_done=prev_done,
+            prev_state=prev_state)
+
+        v_pred = self._value_head(
+            features=new_state)
+
+        return v_pred, new_state
