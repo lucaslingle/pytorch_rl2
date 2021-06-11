@@ -400,7 +400,7 @@ def training_loop(
 def create_argparser():
     parser = argparse.ArgumentParser(
         description="""Training script.""")
-    parser.add_argument("--mode", choice=['mdp', 'bandit'], default='mdp')
+    parser.add_argument("--mode", choices=['mdp', 'bandit'], default='mdp')
     parser.add_argument("--max_pol_iters", type=int, default=1000)
     parser.add_argument("--num_states", type=int, default=10)
     parser.add_argument("--num_actions", type=int, default=5)
