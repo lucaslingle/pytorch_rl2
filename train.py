@@ -134,7 +134,7 @@ def assign_credit(
         lam: GAE decay parameter.
 
     Returns:
-        meta_episode: an instance of the meta-episode dataclass,
+        meta_episode: an instance of the meta-episode class,
         with updated advantage estimates and td lambda returns computed.
     """
     T = len(meta_episode.acs)
