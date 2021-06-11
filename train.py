@@ -422,22 +422,44 @@ def create_argparser():
     return parser
 
 
+def create_env(mode, num_states, num_actions, episode_len):
+    if mode == 'mdp':
+        env = MDPEnv(
+            num_states=num_states,
+            num_actions=num_actions,
+            max_ep_length=episode_len)
+        return env
+    else:
+        env = BanditEnv(
+            num_actions=num_actions)
+        return env
+
+
+def create_agent(mode, num_states, num_actions):
+    if mode == 'mdp':
+        policy_net = PolicyNetworkMDP(
+            num_states=num_states, num_actions=num_actions)
+        value_net = ValueNetworkMDP(
+            num_states=num_states, num_actions=num_actions)
+        return policy_net, value_net
+    else:
+        policy_net = PolicyNetworkMAB(num_actions=num_actions)
+        value_net = ValueNetworkMAB(num_actions=num_actions)
+        return policy_net, value_net
+
+
 def main():
     args = create_argparser().parse_args()
 
     # create env and learning system.
-    env_cls = MDPEnv if args.mode == 'mdp' else BanditEnv
-    env = env_cls(
+    env = create_env(
+        mode=args.mode,
         num_states=args.num_states,
         num_actions=args.num_actions,
-        max_ep_length=args.episode_len)
+        episode_len=args.episode_len)
 
-    policy_cls = PolicyNetworkMDP if args.mode == 'mdp' else PolicyNetworkMAB
-    policy_net = policy_cls(
-        num_states=args.num_states,
-        num_actions=args.num_actions)
-    value_cls = ValueNetworkMDP if args.mode == 'mdp' else ValueNetworkMAB
-    value_net = value_cls(
+    policy_net, value_net = create_agent(
+        mode=args.mode,
         num_states=args.num_states,
         num_actions=args.num_actions)
 

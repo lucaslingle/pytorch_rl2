@@ -10,6 +10,7 @@ ObsType = TypeVar('ObsType')
 
 
 class MetaEpisodicEnv(abc.ABC):
+    @abc.abstractmethod
     def new_env(self) -> None:
         """
         Reset the environment's structure by resampling
@@ -21,6 +22,7 @@ class MetaEpisodicEnv(abc.ABC):
         """
         pass
 
+    @abc.abstractmethod
     def reset(self) -> ObsType:
         """
         Resets the environment's state to some designated initial state.
@@ -32,6 +34,7 @@ class MetaEpisodicEnv(abc.ABC):
         """
         pass
 
+    @abc.abstractmethod
     def step(
         self,
         action: int,
