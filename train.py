@@ -63,6 +63,11 @@ def generate_meta_episode(
     """
 
     env.new_env()
+    meta_episode = MetaEpisode(
+        episode_len=episode_len,
+        num_episodes=num_episodes,
+        dummy_obs=env.reset())
+
     t = 0
     o_t = np.array([env.reset()])
     a_tm1 = np.array([0])
@@ -70,11 +75,6 @@ def generate_meta_episode(
     d_tm1 = np.array([1.0])
     h_tm1_policy_net = policy_net.initial_state(batch_size=1)
     h_tm1_value_net = value_net.initial_state(batch_size=1)
-
-    meta_episode = MetaEpisode(
-        episode_len=episode_len,
-        num_episodes=num_episodes,
-        dummy_obs=o_t)
 
     for episode_num in range(0, num_episodes):
         for episode_step in range(0, episode_len):
@@ -97,7 +97,7 @@ def generate_meta_episode(
 
             o_tp1, r_t, done_t, _ = env.step(a_t, auto_reset=True)
 
-            meta_episode.obs[t] = np.squeeze(o_t, axis=0)
+            meta_episode.obs[t] = o_t[0]
             meta_episode.acs[t] = a_t.squeeze(0).detach().numpy()
             meta_episode.rews[t] = r_t
             meta_episode.dones[t] = float(done_t)
@@ -392,10 +392,10 @@ def training_loop(
             policy_checkpoint_fn(pol_iter)
             value_checkpoint_fn(pol_iter)
 
-"""
+
 def create_argparser():
     parser = argparse.ArgumentParser(
-        description="Training script.")
+        description="""Training script.""")
     parser.add_argument("--mode", choices=['mdp', 'bandit'], default='mdp')
     parser.add_argument("--max_pol_iters", type=int, default=1000)
     parser.add_argument("--num_states", type=int, default=10)
@@ -406,32 +406,6 @@ def create_argparser():
     parser.add_argument("--episode_len", type=int, default=10)
     parser.add_argument("--episodes_per_meta_episode", type=int, default=10)
     parser.add_argument("--meta_episodes_per_policy_update", type=int, default=30000//100)
-    parser.add_argument("--meta_episodes_per_actor_batch", type=int, default=60)
-    parser.add_argument("--ppo_opt_epochs", type=int, default=40)
-    parser.add_argument("--ppo_clip_param", type=float, default=0.10)
-    parser.add_argument("--ppo_ent_coef", type=float, default=0.01)
-    parser.add_argument("--discount_gamma", type=float, default=0.99)
-    parser.add_argument("--gae_lambda", type=float, default=0.3)
-    parser.add_argument("--adam_lr", type=float, default=1e-4)
-    parser.add_argument("--adam_eps", type=float, default=1e-3)
-    parser.add_argument("--experiment_seed", type=int, default=0) # not yet used
-    return parser
-"""
-
-### debug only ###
-def create_argparser():
-    parser = argparse.ArgumentParser(
-        description="""Training script.""")
-    parser.add_argument("--mode", choices=['mdp', 'bandit'], default='mdp')
-    parser.add_argument("--max_pol_iters", type=int, default=10)
-    parser.add_argument("--num_states", type=int, default=10)
-    parser.add_argument("--num_actions", type=int, default=5)
-    parser.add_argument("--model_name", type=str, default='defaults')
-    parser.add_argument("--checkpoint_dir", type=str, default='checkpoints')
-    parser.add_argument("--checkpoint_interval", type=int, default=10)
-    parser.add_argument("--episode_len", type=int, default=10)
-    parser.add_argument("--episodes_per_meta_episode", type=int, default=10)
-    parser.add_argument("--meta_episodes_per_policy_update", type=int, default=3)
     parser.add_argument("--meta_episodes_per_actor_batch", type=int, default=60)
     parser.add_argument("--ppo_opt_epochs", type=int, default=40)
     parser.add_argument("--ppo_clip_param", type=float, default=0.10)
