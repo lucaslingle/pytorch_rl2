@@ -93,6 +93,7 @@ class MDPEnv(MetaEpisodicEnv):
         s_tp1_probs = self._state_transition_probabilities[a_t, s_t]
         s_tp1 = np.random.choice(
             a=self._num_states, p=s_tp1_probs)
+        self._state = s_tp1
 
         r_t_mu = self._reward_means[s_t, a_t]
         r_t_sigma = self._reward_stddev
