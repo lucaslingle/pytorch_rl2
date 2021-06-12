@@ -38,7 +38,7 @@ class MDPEnv(MetaEpisodicEnv):
 
     def _new_reward_means(self):
         rsa_mus = np.random.normal(
-            loc=1.0, scale=1.0, shape=(self._num_states, self._num_actions))
+            loc=1.0, scale=1.0, size=(self._num_states, self._num_actions))
         self._reward_means = rsa_mus
 
     def _new_state_transition_probabilities(self):
@@ -92,11 +92,11 @@ class MDPEnv(MetaEpisodicEnv):
 
         s_tp1_probs = self._state_transition_probabilities[a_t, s_t]
         s_tp1 = np.random.choice(
-            a=self._num_states, p=s_tp1_probs)[0]
+            a=self._num_states, p=s_tp1_probs)
 
         r_t_mu = self._reward_means[s_t, a_t]
         r_t_sigma = self._reward_stddev
-        r_t_noise = np.random.normal(loc=0.0, scale=1.0)[0]
+        r_t_noise = np.random.normal(loc=0.0, scale=1.0)
         r_t = r_t_mu + r_t_sigma * r_t_noise
 
         done_t = False if t < self._max_ep_length else True

@@ -64,7 +64,7 @@ def generate_meta_episode(
 
     env.new_env()
     t = 0
-    o_t = env.reset()
+    o_t = np.array([env.reset()])
     a_tm1 = np.array([0])
     r_tm1 = np.array([0.0])
     d_tm1 = np.array([1.0])
@@ -104,7 +104,7 @@ def generate_meta_episode(
             meta_episode.logpacs[t] = log_prob_a_t.squeeze(0).detach().numpy()
             meta_episode.vpreds[t] = vpred_t.squeeze(0).detach().numpy()
 
-            o_t = o_tp1
+            o_t = np.array([o_tp1])
             a_tm1 = np.array([meta_episode.acs[t]])
             r_tm1 = np.array([meta_episode.rews[t]])
             d_tm1 = np.array([meta_episode.dones[t]])
@@ -407,7 +407,7 @@ def create_argparser():
     parser.add_argument("--episodes_per_meta_episode", type=int, default=10)
     parser.add_argument("--meta_episodes_per_policy_update", type=int, default=30000//100)
     parser.add_argument("--meta_episodes_per_actor_batch", type=int, default=60)
-    parser.add_argument("--ppo_opt_epochs", type=int, default=4)
+    parser.add_argument("--ppo_opt_epochs", type=int, default=40)
     parser.add_argument("--ppo_clip_param", type=float, default=0.10)
     parser.add_argument("--ppo_ent_coef", type=float, default=0.01)
     parser.add_argument("--discount_gamma", type=float, default=0.99)
