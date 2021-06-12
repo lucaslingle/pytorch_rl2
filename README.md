@@ -71,3 +71,37 @@ By default, checkpoints are saved to ```./checkpoints/defaults```. To pick a dif
 you can set the ```--checkpoint_dir``` flag, and to pick a different checkpoint name, you can set the 
 ```--model_name``` flag.
 
+## Reproducing the Paper
+
+### Bandit case:
+
+| Setup      | Random | Gittins |    TS |   OTS |  UCB1 | eps-Greedy | Greedy | RL^2 (paper) | RL^2 (ours) |
+| ---------- | ------ | ------- | ----- | ----- | ----- | ---------- | ------ | ------------ | ----------- | 
+|  n=10,k=5  |    5.0 |     6.6 |   5.7 |   6.5 |   6.7 |        6.6 |    6.6 |          6.7 |             |
+|  n=10,k=10 |    5.0 |     6.6 |   5.5 |   6.2 |   6.7 |        6.6 |    6.6 |          6.7 |             |
+|  n=10,k=50 |    5.1 |     6.5 |   5.2 |   5.5 |   6.6 |        6.5 |    6.5 |          6.8 |             |
+| n=100,k=5  |   49.9 |    78.3 |  74.7 |  77.9 |  78.0 |       75.4 |   74.8 |         78.7 |             |
+| n=100,k=10 |   49.9 |    82.8 |  76.7 |  81.4 |  82.4 |       77.4 |   77.1 |         83.5 |             |
+| n=100,k=50 |   49.8 |    85.2 |  64.5 |  67.7 |  84.3 |       78.3 |   78.0 |         84.9 |             |
+| n=500,k=5  |  249.8 |   405.8 | 402.0 | 406.7 | 405.8 |      388.2 |  380.6 |        401.6 |             |
+| n=500,k=10 |  249.0 |   437.8 | 429.5 | 438.9 | 437.1 |      408.0 |  395.0 |        432.5 |             |
+| n=500,k=50 |  249.6 |   463.7 | 427.2 | 437.6 | 457.6 |      413.6 |  402.8 |        438.9 |             |
+
+### MDP case:
+
+| Setup      | Random |   PSRL |  OPSRL |  UCRL2 |    BEB | eps-Greedy | Greedy | RL^2 (paper) | RL^2 (ours) |
+| ---------- | ------ | ------ | ------ | ------ | ------ | ---------- | ------ | ------------ | ----------- |
+| n=10       |  100.1 |  138.1 |  144.1 |  146.6 |  150.2 |      132.8 |  134.8 |        156.2 |             |
+| n=25       |  250.2 |  408.8 |  425.2 |  424.1 |  427.8 |      377.3 |  368.8 |        445.7 |             |
+| n=50       |  499.7 |  904.4 |  930.7 |  918.9 |  917.8 |      823.3 |  769.3 |        936.1 |             |
+| n=75       |  749.9 | 1417.1 | 1449.2 | 1427.6 | 1422.6 |     1293.9 | 1172.9 |       1428.8 |             |
+| n=100      |  999.4 | 1939.5 | 1973.9 | 1942.1 | 1935.1 |     1778.2 | 1578.5 |       1913.7 |             |
+
+Note that in our case, we use PPO instead of TRPO, and we report peak performance over training. This was always similar to, 
+but not always identical to, final performance. 
+
+In all cases, we used a configuration where the total number of observations per policy improvement phase was equal to 240,000. 
+The per-process batch size was 60 trajectories. There were 8 processes. There were 200 gradient steps per policy improvement phase. 
+To stabilize training, we used the Adam hyperparameters from [Kapturowski et al., 2019](https://openreview.net/pdf?id=r1lyTjAqYX). 
+
+The number of PPO optimization epochs and collected trajectories were varied dynamically per setting to meet this fixed configuration.  
