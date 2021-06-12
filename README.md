@@ -91,7 +91,7 @@ you can set the ```--checkpoint_dir``` flag, and to pick a different checkpoint 
 
 | Setup      | Random |   PSRL |  OPSRL |  UCRL2 |    BEB | eps-Greedy | Greedy | RL^2 (paper) | RL^2 (ours) |
 | ---------- | ------ | ------ | ------ | ------ | ------ | ---------- | ------ | ------------ | ----------- |
-| n=10       |  100.1 |  138.1 |  144.1 |  146.6 |  150.2 |      132.8 |  134.8 |        156.2 |             |
+| n=10       |  100.1 |  138.1 |  144.1 |  146.6 |  150.2 |      132.8 |  134.8 |        156.2 |       174.2 |
 | n=25       |  250.2 |  408.8 |  425.2 |  424.1 |  427.8 |      377.3 |  368.8 |        445.7 |             |
 | n=50       |  499.7 |  904.4 |  930.7 |  918.9 |  917.8 |      823.3 |  769.3 |        936.1 |             |
 | n=75       |  749.9 | 1417.1 | 1449.2 | 1427.6 | 1422.6 |     1293.9 | 1172.9 |       1428.8 |             |
@@ -103,3 +103,9 @@ but not always identical to, final performance.
 In all cases, we used a configuration where the total number of observations per policy improvement phase was equal to 240,000. 
 The per-process batch size was 60 trajectories. There were 8 processes. There were 200 gradient steps per policy improvement phase. 
 To stabilize training, we used the Adam hyperparameters from [Kapturowski et al., 2019](https://openreview.net/pdf?id=r1lyTjAqYX). 
+
+Finally, note that the numbers for the MDP case are provisional, as we sample a stochastic reward at each timestep from a normal distribution 
+with unit variance, and resample the means when instantiating a new MDP. It is possible, and perhaps likely, that Duan et al., 2016 
+sampled the means once when creating the benchmark, and then sampled new deterministic reward for each MDP from a normal distribution 
+with these means and with unit variances. (If true, this could make their results a bit difficult to reproduce, since the distribution over MDPs 
+would depend heavily on the random means sampled from the hyperprior.)
