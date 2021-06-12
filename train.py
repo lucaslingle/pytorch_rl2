@@ -138,14 +138,14 @@ def assign_credit(
         with generalized advantage estimates and td lambda returns computed.
     """
     T = len(meta_episode.acs)
-    for t in reversed(range(1, T+1)):  # T, ..., 1.
-        r_t = meta_episode.rews[t-1]
-        V_t = meta_episode.vpreds[t-1]
-        V_tp1 = meta_episode.vpreds[t] if t < T else 0.0
-        A_tp1 = meta_episode.advs[t] if t < T else 0.0
+    for t in reversed(range(0, T)):  # T-1, ..., 0.
+        r_t = meta_episode.rews[t]
+        V_t = meta_episode.vpreds[t]
+        V_tp1 = meta_episode.vpreds[t+1] if t+1 < T else 0.0
+        A_tp1 = meta_episode.advs[t+1] if t+1 < T else 0.0
         delta_t = -V_t + r_t + gamma * V_tp1
         A_t = delta_t + gamma * lam * A_tp1
-        meta_episode.advs[t-1] = A_t
+        meta_episode.advs[t] = A_t
 
     meta_episode.tdlam_rets = meta_episode.vpreds + meta_episode.advs
     return meta_episode
@@ -191,18 +191,22 @@ def compute_losses(
     # for backprop thru time.
     B = len(meta_episodes)
     T = len(meta_episodes[0].acs)
-    t = 1
-    o_t = mb_obs[:, 0]
-    a_tm1 = tc.zeros(dtype=tc.int64, size=(B,))
-    r_tm1 = tc.zeros(dtype=tc.float32, size=(B,))
-    d_tm1 = tc.ones(dtype=tc.float32, size=(B,))
-    h_tm1_policy_net = policy_net.initial_state(batch_size=B)
-    h_tm1_value_net = value_net.initial_state(batch_size=B)
+
+    ac_dummy = tc.zeros(dtype=tc.int64, size=(B,))
+    rew_dummy = tc.zeros(dtype=tc.float32, size=(B,))
+    done_dummy = tc.ones(dtype=tc.float32, size=(B,))
+    h_tm1_policy_net = policy_net.initial_state(batch_size=B)  # will be ref var
+    h_tm1_value_net = value_net.initial_state(batch_size=B)    # will be ref var
 
     entropies = []
-    vpreds_new = []
     logpacs_new = []
-    while t < T+1:
+    vpreds_new = []
+    for t in range(0, T):
+        o_t = mb_obs[:, t]
+        a_tm1 = ac_dummy if t == 0 else mb_acs[:, t-1]
+        r_tm1 = rew_dummy if t == 0 else mb_rews[:, t-1]
+        d_tm1 = done_dummy if t == 0 else mb_dones[:, t-1]
+
         pi_dist_t, h_t_policy_net = policy_net(
             curr_obs=o_t,
             prev_action=a_tm1,
@@ -220,22 +224,14 @@ def compute_losses(
         ent_t = pi_dist_t.entropy()
         entropies.append(ent_t)
 
-        o_tp1 = mb_obs[:, t]
-        a_t = mb_acs[:, t-1]
-        r_t = mb_rews[:, t-1]
-        d_t = mb_dones[:, t-1]
-
+        a_t = mb_acs[:, t]
         logprob_a_t_new = pi_dist_t.log_prob(a_t)
         logpacs_new.append(logprob_a_t_new)
+
         vpreds_new.append(vpred_t)
 
-        o_t = o_tp1
-        a_tm1 = a_t
-        r_tm1 = r_t
-        d_tm1 = d_t
         h_tm1_policy_net = h_t_policy_net
         h_tm1_value_net = h_t_value_net
-        t += 1
 
     # assemble relevant gradient-tracked quantities from our loop above.
     entropies = tc.stack(entropies, dim=1)
