@@ -12,7 +12,7 @@ class StatefulPolicyNet(abc.ABC, tc.nn.Module):
     @abc.abstractmethod
     def initial_state(self, batch_size: int) -> tc.FloatTensor:
         """
-        Return initial state of zeros.
+        Returns a batch-tiled initial state of zeros.
 
         Args:
             batch_size: batch size to tile the initial state by.
@@ -53,7 +53,7 @@ class StatefulValueNet(abc.ABC, tc.nn.Module):
     @abc.abstractmethod
     def initial_state(self, batch_size: int) -> tc.FloatTensor:
         """
-        Return initial state of zeros.
+        Returns a batch-tiled initial state of zeros.
 
         Args:
             batch_size: batch size to tile the initial state by.
