@@ -84,9 +84,6 @@ class MDPEnv(MetaEpisodicEnv):
 
         Returns:
             new_state, reward, done, info.
-
-        Note that new_state is always None, done is always True,
-        and info is always an empty dictionary.
         """
         self._ep_steps_so_far += 1
         t = self._ep_steps_so_far

@@ -68,9 +68,6 @@ class BanditEnv(MetaEpisodicEnv):
 
         Returns:
             new_state, reward, done, info.
-
-        Note that new_state is always None, done is always True,
-        and info is always an empty dictionary.
         """
 
         # bernoulli bandit
