@@ -4,8 +4,8 @@ Implements training loop for the MDP agent from Duan et al., 2016
 """
 
 from typing import List, Dict, Optional, Callable
-from collections import deque
 from functools import partial
+from collections import deque
 import argparse
 
 import torch as tc
@@ -387,7 +387,7 @@ def training_loop(
         # misc.: print metrics, save checkpoint.
         if comm.Get_rank() == ROOT_RANK:
             print("-" * 100)
-            print(f"mean meta-episode return: {np.mean(meta_ep_returns)}")
+            print(f"mean meta-episode return: {np.mean(meta_ep_returns):>0.3f}")
             print("-" * 100)
             policy_checkpoint_fn(pol_iter)
             value_checkpoint_fn(pol_iter)

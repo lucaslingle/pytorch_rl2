@@ -33,24 +33,24 @@ def _latest_step(base_path):
 
 
 def save_checkpoint(
+        steps,
         checkpoint_dir,
         model_name,
         model,
         optimizer,
-        scheduler,
-        steps
+        scheduler
     ):
     """
     Saves a checkpoint of the latest model, optimizer, scheduler state.
     Also tidies up checkpoint_dir/model_name/ by keeping only last 5 ckpts.
 
     Args:
+        steps: num steps for the checkpoint to save.
         checkpoint_dir: checkpoint dir for checkpointing.
         model_name: model name for checkpointing.
         model: model to be updated from checkpoint.
         optimizer: optimizer to be updated from checkpoint.
         scheduler: scheduler to be updated from checkpoint.
-        steps: env steps for the checkpoint to locate. if none, use latest.
 
     Returns:
         None
@@ -94,7 +94,7 @@ def maybe_load_checkpoint(
         model: model to be updated from checkpoint.
         optimizer: optimizer to be updated from checkpoint.
         scheduler: scheduler to be updated from checkpoint.
-        steps: env steps for the checkpoint to locate. if none, use latest.
+        steps: num steps for the checkpoint to locate. if none, use latest.
 
     Returns:
         number of env steps experienced by loaded checkpoint.
