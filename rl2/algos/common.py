@@ -1,6 +1,6 @@
 """
 Implements common algorithmic components for training
-stateful reinforcement learning agents.
+stateful meta-reinforcement learning agents.
 """
 
 import torch as tc

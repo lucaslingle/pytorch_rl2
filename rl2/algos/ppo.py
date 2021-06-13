@@ -1,6 +1,6 @@
 """
 Implements ppo loss computations for training
-stateful reinforcement learning agents.
+stateful meta-reinforcement learning agents.
 """
 
 from typing import List, Dict, Optional, Callable
