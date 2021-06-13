@@ -54,7 +54,6 @@ def create_env(num_states, num_actions, episode_len, checkpoint_dir, comm):
 
     # on process with rank zero...
     if comm.Get_rank() == ROOT_RANK:
-
         env_base_path = os.path.join(checkpoint_dir, 'mdp_env')
         os.makedirs(env_base_path, exist_ok=True)
 
