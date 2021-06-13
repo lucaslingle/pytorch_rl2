@@ -4,7 +4,7 @@ Implements training loop for the bandit agent from Duan et al., 2016
 """
 
 import argparse
-import os.path
+import os
 import pickle
 from functools import partial
 
@@ -54,7 +54,8 @@ def create_env(num_states, num_actions, episode_len, checkpoint_dir, comm):
 
     # on process with rank zero...
     if comm.Get_rank() == ROOT_RANK:
-        env_base_path = os.path.join(checkpoint_dir, 'mdp_env', 'wb')
+        env_base_path = os.path.join(checkpoint_dir, 'mdp_env')
+        os.makedirs(env_base_path, exist_ok=True)
 
         # deserialize reward means from a pickled file if present,
         # else make it
@@ -63,7 +64,7 @@ def create_env(num_states, num_actions, episode_len, checkpoint_dir, comm):
             with open(fp1, 'rb') as f1:
                 reward_means = pickle.load(f1)
         else:
-            with open(fp1, 'wb') as f1:
+            with open(fp1, 'wb+') as f1:
                 pickle.dump(reward_means, f1, protocol=pickle.HIGHEST_PROTOCOL)
 
         # deserialize dirichlet conc params from a pickled file if present,
@@ -73,7 +74,7 @@ def create_env(num_states, num_actions, episode_len, checkpoint_dir, comm):
             with open(fp2, 'rb') as f2:
                 dirichlet_conc_params = pickle.load(f2)
         else:
-            with open(fp2, 'wb') as f2:
+            with open(fp2, 'wb+') as f2:
                 pickle.dump(
                     dirichlet_conc_params, f2, protocol=pickle.HIGHEST_PROTOCOL)
 
