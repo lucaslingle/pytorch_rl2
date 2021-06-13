@@ -15,7 +15,7 @@ class MDPEnv(MetaEpisodicEnv):
     Tabular MDP env with support for resettable MDP params (new meta-episode),
     in addition to the usual reset (new episode).
     """
-    def __init__(self, num_states, num_actions, max_ep_length=10):
+    def __init__(self, num_states, num_actions, max_episode_length=10):
         self._num_states = num_states
         self._num_actions = num_actions
         self._reward_means = None
@@ -23,7 +23,7 @@ class MDPEnv(MetaEpisodicEnv):
         self._state_transition_probabilities = None
         self._state = None
         self._ep_steps_so_far = 0
-        self._max_ep_length = max_ep_length
+        self._max_ep_length = max_episode_length
         self.new_env()
 
     @property
