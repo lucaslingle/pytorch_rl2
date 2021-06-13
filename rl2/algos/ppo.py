@@ -13,7 +13,7 @@ from mpi4py import MPI
 from rl2.agents.abstract import StatefulPolicyNet, StatefulValueNet
 from rl2.envs.abstract import MetaEpisodicEnv
 from rl2.algos.common import MetaEpisode, generate_meta_episode, assign_credit
-from rl2.utils.comm_util import get_comm, sync_grads
+from rl2.utils.comm_util import sync_grads
 from rl2.utils.constants import ROOT_RANK
 
 
@@ -152,7 +152,8 @@ def training_loop(
         max_pol_iters: int,
         pol_iters_so_far: int,
         policy_checkpoint_fn: Callable[[int], None],
-        value_checkpoint_fn: Callable[[int], None]
+        value_checkpoint_fn: Callable[[int], None],
+        comm: type(MPI.COMM_WORLD),
     ) -> None:
     """
     Train a stateful RL^2 agent via PPO to maximize discounted cumulative reward
@@ -180,11 +181,11 @@ def training_loop(
         pol_iters_so_far: the number of policy improvements made so far.
         policy_checkpoint_fn: a callback for saving checkpoints of policy net.
         value_checkpoint_fn: a callback for saving checkpoints of value net.
+        comm: mpi comm_world communicator object.
 
     Returns:
         None
     """
-    comm = get_comm()
     meta_ep_returns = deque(maxlen=1000)
 
     for pol_iter in range(pol_iters_so_far, max_pol_iters):
