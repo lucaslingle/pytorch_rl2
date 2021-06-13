@@ -54,6 +54,7 @@ def create_env(num_states, num_actions, episode_len, checkpoint_dir, comm):
 
     # on process with rank zero...
     if comm.Get_rank() == ROOT_RANK:
+
         env_base_path = os.path.join(checkpoint_dir, 'mdp_env')
         os.makedirs(env_base_path, exist_ok=True)
 
@@ -80,8 +81,8 @@ def create_env(num_states, num_actions, episode_len, checkpoint_dir, comm):
 
     # now we broadcast contents stored in the reference variable on process zero
     # to all the other processes
-    reward_means = comm.Bcast(reward_means, root=ROOT_RANK)
-    dirichlet_conc_params = comm.Bcast(dirichlet_conc_params, root=ROOT_RANK)
+    comm.Bcast(reward_means, root=ROOT_RANK)
+    comm.Bcast(dirichlet_conc_params, root=ROOT_RANK)
 
     # ... and load them into the env.
     env.set_reward_means(reward_means)

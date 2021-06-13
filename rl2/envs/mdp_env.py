@@ -66,8 +66,8 @@ class MDPEnv(MetaEpisodicEnv):
         return self._dirichlet_conc_params
 
     def _new_reward_function(self):
-        self._reward_function = np.random.normal(
-            loc=self._reward_means,
+        self._reward_function = self._reward_means + np.random.normal(
+            loc=0.0,
             scale=1.0,
             size=(self._num_states, self._num_actions)
         )
