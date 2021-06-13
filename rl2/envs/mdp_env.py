@@ -28,10 +28,11 @@ class MDPEnv(MetaEpisodicEnv):
         # per-environment-sample quantities.
         self._reward_function = None
         self._state_transition_probabilities = None
-
-        self._state = None
-        self._ep_steps_so_far = 0
         self.new_env()
+
+        # mdp state.
+        self._ep_steps_so_far = 0
+        self._state = 0
 
     @property
     def num_actions(self):
