@@ -103,9 +103,3 @@ but not always identical to, final performance.
 In all cases, we used a configuration where the total number of observations per policy improvement phase was equal to 240,000. 
 The per-process batch size was 60 trajectories. There were 8 processes. There were 200 gradient steps per policy improvement phase. 
 To stabilize training, we used the Adam hyperparameters from [Kapturowski et al., 2019](https://openreview.net/pdf?id=r1lyTjAqYX). 
-
-Finally, note that the numbers for the MDP case are provisional, as we sample a stochastic reward at each timestep from a normal distribution 
-with unit variance, and resample the means when instantiating a new MDP. It is possible, and perhaps likely, that Duan et al., 2016 
-sampled the means once when creating the benchmark, and then sampled new deterministic rewards from a normal distribution 
-with these means and with unit variances, for each state-action pair in each newly sampled MDP. (If true, this could make their results a bit difficult to reproduce, since the distribution over MDPs 
-would depend heavily on the random means sampled from the hyperprior.)
