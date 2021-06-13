@@ -80,7 +80,9 @@ def generate_meta_episode(
             a_t = pi_dist_t.sample()
             log_prob_a_t = pi_dist_t.log_prob(a_t)
 
-            o_tp1, r_t, done_t, _ = env.step(a_t, auto_reset=True)
+            o_tp1, r_t, done_t, _ = env.step(
+                action=a_t.squeeze(0).detach().numpy(),
+                auto_reset=True)
 
             meta_episode.obs[t] = o_t[0]
             meta_episode.acs[t] = a_t.squeeze(0).detach().numpy()

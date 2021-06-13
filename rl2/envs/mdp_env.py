@@ -49,7 +49,7 @@ class MDPEnv(MetaEpisodicEnv):
             loc=1.0, scale=1.0, size=(self._num_states, self._num_actions))
 
     def _initialize_dirichlet_conc_params(self):
-        return 1.0 * np.ones(dtype=np.float32, shape=(self._num_actions,))
+        return 1.0 * np.ones(dtype=np.float32, shape=(self._num_states,))
 
     def set_reward_means(self, reward_means):
         self._reward_means = reward_means
