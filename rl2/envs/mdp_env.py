@@ -19,18 +19,18 @@ class MDPEnv(MetaEpisodicEnv):
         # structural
         self._num_states = num_states
         self._num_actions = num_actions
+        self._max_ep_length = max_episode_length
 
         # per-experiment quantities.
         self._reward_means = self._initialize_reward_means()
         self._dirichlet_conc_params = self._initialize_dirichlet_conc_params()
 
+        # per-environment-sample quantities.
         self._reward_function = None
         self._state_transition_probabilities = None
 
-        # per-process quantities.
         self._state = None
         self._ep_steps_so_far = 0
-        self._max_ep_length = max_episode_length
         self.new_env()
 
     @property
