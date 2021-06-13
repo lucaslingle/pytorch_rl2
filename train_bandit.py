@@ -41,10 +41,12 @@ def create_argparser():
 
 def main():
     args = create_argparser().parse_args()
+    comm = get_comm()
 
-    # create env and learning system.
+    # create env.
     env = BanditEnv(num_actions=args.num_actions)
 
+    # create learning system.
     policy_net = PolicyNetworkMAB(num_actions=args.num_actions)
     value_net = ValueNetworkMAB(num_actions=args.num_actions)
 
@@ -61,7 +63,6 @@ def main():
     value_scheduler = None
 
     # load checkpoint, if applicable.
-    comm = get_comm()
     pol_iters_so_far = 0
     if comm.Get_rank() == ROOT_RANK:
         a = maybe_load_checkpoint(
@@ -138,7 +139,8 @@ def main():
         max_pol_iters=args.max_pol_iters,
         pol_iters_so_far=pol_iters_so_far,
         policy_checkpoint_fn=policy_checkpoint_fn,
-        value_checkpoint_fn=value_checkpoint_fn)
+        value_checkpoint_fn=value_checkpoint_fn,
+        comm=comm)
 
 
 if __name__ == '__main__':
