@@ -21,12 +21,8 @@ class MDPEnv(MetaEpisodicEnv):
         self._num_actions = num_actions
         self._max_ep_length = max_episode_length
 
-        # per-experiment quantities.
-        self._reward_means = self._initialize_reward_means()
-        self._dirichlet_conc_params = self._initialize_dirichlet_conc_params()
-
         # per-environment-sample quantities.
-        self._reward_function = None
+        self._reward_means = None
         self._state_transition_probabilities = None
         self.new_env()
 
@@ -44,43 +40,17 @@ class MDPEnv(MetaEpisodicEnv):
         """Get self._num_states."""
         return self._num_states
 
-    def _initialize_reward_means(self):
-        return np.random.normal(
+    def _new_reward_means(self):
+        self._reward_means = np.random.normal(
             loc=1.0, scale=1.0, size=(self._num_states, self._num_actions))
 
-    def _initialize_dirichlet_conc_params(self):
-        return 1.0 * np.ones(dtype=np.float32, shape=(self._num_states,))
-
-    def set_reward_means(self, reward_means):
-        self._reward_means = reward_means
-
-    def set_dirichlet_conc_params(self, dir_conc_params):
-        self._dirichlet_conc_params = dir_conc_params
-
-    @property
-    def reward_means(self):
-        return self._reward_means
-
-    @property
-    def dirichlet_conc_params(self):
-        return self._dirichlet_conc_params
-
-    def _new_reward_function(self):
-        self._reward_function = self._reward_means + np.random.normal(
-            loc=0.0,
-            scale=1.0,
-            size=(self._num_states, self._num_actions)
-        )
-
-    def _new_state_transition_probabilities(self):
+    def _new_state_transition_dynamics(self):
         p_aijs = []
         for a in range(self._num_actions):
-            dirichlet_samples = np.random.dirichlet(
-                alpha=self._dirichlet_conc_params,
-                size=(self._num_states,)
-            )
-            p_aijs.append(dirichlet_samples)
-
+            dirichlet_samples_ij = np.random.dirichlet(
+                alpha=np.ones(dtype=np.float32, shape=(self._num_states,)),
+                size=(self._num_states,))
+            p_aijs.append(dirichlet_samples_ij)
         self._state_transition_probabilities = np.stack(p_aijs, axis=0)
 
     def new_env(self) -> None:
@@ -90,8 +60,8 @@ class MDPEnv(MetaEpisodicEnv):
         Returns:
             None
         """
-        self._new_reward_function()
-        self._new_state_transition_probabilities()
+        self._new_reward_means()
+        self._new_state_transition_dynamics()
         self._state = 0
 
     def reset(self) -> int:
@@ -118,15 +88,18 @@ class MDPEnv(MetaEpisodicEnv):
         """
         self._ep_steps_so_far += 1
         t = self._ep_steps_so_far
+
         s_t = self._state
         a_t = action
 
-        s_tp1_probs = self._state_transition_probabilities[a_t, s_t]
         s_tp1 = np.random.choice(
-            a=self._num_states, p=s_tp1_probs)
+            a=self._num_states,
+            p=self._state_transition_probabilities[a_t, s_t])
         self._state = s_tp1
 
-        r_t = self._reward_function[s_t, a_t]
+        r_t = np.random.normal(
+            loc=self._reward_means[s_t, a_t],
+            scale=1.0)
 
         done_t = False if t < self._max_ep_length else True
         if done_t and auto_reset:

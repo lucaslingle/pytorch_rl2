@@ -4,8 +4,6 @@ Implements training loop for the bandit agent from Duan et al., 2016
 """
 
 import argparse
-import os
-import pickle
 from functools import partial
 
 import torch as tc
@@ -43,64 +41,15 @@ def create_argparser():
     return parser
 
 
-def create_env(num_states, num_actions, episode_len, checkpoint_dir, comm):
-    env = MDPEnv(
-        num_states=num_states,
-        num_actions=num_actions,
-        max_episode_length=episode_len)
-
-    reward_means = env.reward_means
-    dirichlet_conc_params = env.dirichlet_conc_params
-
-    # on process with rank zero...
-    if comm.Get_rank() == ROOT_RANK:
-        env_base_path = os.path.join(checkpoint_dir, 'mdp_env')
-        os.makedirs(env_base_path, exist_ok=True)
-
-        # deserialize reward means from a pickled file if present,
-        # else make it
-        fp1 = os.path.join(env_base_path, 'reward_means')
-        if os.path.exists(fp1):
-            with open(fp1, 'rb') as f1:
-                reward_means = pickle.load(f1)
-        else:
-            with open(fp1, 'wb') as f1:
-                pickle.dump(reward_means, f1, protocol=pickle.HIGHEST_PROTOCOL)
-
-        # deserialize dirichlet conc params from a pickled file if present,
-        # else make it
-        fp2 = os.path.join(env_base_path, 'dirichlet_conc_params')
-        if os.path.exists(fp2):
-            with open(fp2, 'rb') as f2:
-                dirichlet_conc_params = pickle.load(f2)
-        else:
-            with open(fp2, 'wb') as f2:
-                pickle.dump(
-                    dirichlet_conc_params, f2, protocol=pickle.HIGHEST_PROTOCOL)
-
-    # now we broadcast contents stored in the reference variable on process zero
-    # to all the other processes
-    comm.Bcast(reward_means, root=ROOT_RANK)
-    comm.Bcast(dirichlet_conc_params, root=ROOT_RANK)
-
-    # ... and load them into the env.
-    env.set_reward_means(reward_means)
-    env.set_dirichlet_conc_params(dirichlet_conc_params)
-
-    return env
-
-
 def main():
     args = create_argparser().parse_args()
     comm = get_comm()
 
     # create env.
-    env = create_env(
+    env = MDPEnv(
         num_states=args.num_states,
         num_actions=args.num_actions,
-        episode_len=args.episode_len,
-        checkpoint_dir=args.checkpoint_dir,
-        comm=comm)
+        max_episode_length=args.episode_len)
 
     # create learning system.
     policy_net = PolicyNetworkMDP(
