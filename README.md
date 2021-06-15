@@ -17,9 +17,10 @@ This stateful agent can be provided its previous action and the resulting immedi
 The agent's hidden state is believed to approximate sufficient statistics for the belief of which MDP the agent is in [[4]](https://arxiv.org/abs/1905.03030).
 This hidden state guides the agent's learning and behavior in the new environment. 
 
-In practice, maximizing this objective leads to policies which can explore a new environment to learn relevant information to obtain more reward.
-This occurs for exploratory actions that lead the agent to an information state in which it can better exploit the environment. 
-A simplified explanation is that these information states have higher value, and this value is backed up to the exploratory action. 
+In practice, maximizing this objective tends to lead to policies which can explore a new environment to learn relevant information to obtain more reward.
+Intuitively, there may be some exploratory actions that tend to lead the agent to an information state in which it can better exploit the environment. 
+If these information states have higher value than the previous information state, and if the parametrized value function equals the true value function, 
+then the expectation the advantage of the action is positive, so an increase in the probability of the exploratory action under the policy is encouraged by the training process. 
 
 Through such exploration, the agent can acquire the relevant information and transition from a highly exploratory policy to a highly exploitative policy purely through changes in its hidden state.
 
@@ -91,8 +92,8 @@ you can set the ```--checkpoint_dir``` flag, and to pick a different checkpoint 
 
 | Setup      | Random |   PSRL |  OPSRL |  UCRL2 |    BEB | eps-Greedy | Greedy | RL^2 (paper) | RL^2 (ours) |
 | ---------- | ------ | ------ | ------ | ------ | ------ | ---------- | ------ | ------------ | ----------- |
-| n=10       |  100.1 |  138.1 |  144.1 |  146.6 |  150.2 |      132.8 |  134.8 |        156.2 |       195.9 |
-| n=25       |  250.2 |  408.8 |  425.2 |  424.1 |  427.8 |      377.3 |  368.8 |        445.7 |       485.1 |
+| n=10       |  100.1 |  138.1 |  144.1 |  146.6 |  150.2 |      132.8 |  134.8 |        156.2 |             |
+| n=25       |  250.2 |  408.8 |  425.2 |  424.1 |  427.8 |      377.3 |  368.8 |        445.7 |             |
 | n=50       |  499.7 |  904.4 |  930.7 |  918.9 |  917.8 |      823.3 |  769.3 |        936.1 |             |
 | n=75       |  749.9 | 1417.1 | 1449.2 | 1427.6 | 1422.6 |     1293.9 | 1172.9 |       1428.8 |             |
 | n=100      |  999.4 | 1939.5 | 1973.9 | 1942.1 | 1935.1 |     1778.2 | 1578.5 |       1913.7 |             |
