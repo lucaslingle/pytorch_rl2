@@ -19,7 +19,7 @@ This hidden state guides the agent's learning and behavior in the new environmen
 
 In practice, maximizing this objective tends to lead to policies that can explore a new environment to learn relevant information to obtain more reward.
 Intuitively, there may be some exploratory actions that tend to lead the agent to information states from which it can better exploit the environment. 
-If in expectation the next information state has higher value than the previous information state, and if the parametrized value function equals the true value function, 
+If in expectation the immediate reward plus the next information state has higher value than the previous information state, and if the parametrized value function equals the true value function, 
 then the expectation the advantage of the action is positive, so an increase in the probability of the exploratory action under the policy is encouraged by the training process. 
 
 Through such exploration, the agent can acquire the relevant information and transition from a highly exploratory policy to a highly exploitative policy purely through changes in its hidden state.
