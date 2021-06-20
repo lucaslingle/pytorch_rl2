@@ -35,7 +35,7 @@ def create_argparser():
     parser.add_argument("--gae_lambda", type=float, default=0.3)
     parser.add_argument("--adam_lr", type=float, default=1e-4)
     parser.add_argument("--adam_eps", type=float, default=1e-3)
-    parser.add_argument("--adam_wd", type=float, default=1e-5)
+    parser.add_argument("--adam_wd", type=float, default=1e-6)
     parser.add_argument("--experiment_seed", type=int, default=0) # not yet used
     return parser
 
