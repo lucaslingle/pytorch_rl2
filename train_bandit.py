@@ -8,7 +8,7 @@ from functools import partial
 
 import torch as tc
 
-from rl2.agents.bandit_agent import PolicyNetworkMAB, ValueNetworkMAB
+from rl2.agents.bandit_agent import PolicyNetworkLSTM, ValueNetworkLSTM
 from rl2.envs.bandit_env import BanditEnv
 from rl2.algos.ppo import training_loop
 
@@ -35,6 +35,7 @@ def create_argparser():
     parser.add_argument("--gae_lambda", type=float, default=0.3)
     parser.add_argument("--adam_lr", type=float, default=1e-4)
     parser.add_argument("--adam_eps", type=float, default=1e-3)
+    parser.add_argument("--adam_wd", type=float, default=1e-5)
     parser.add_argument("--experiment_seed", type=int, default=0) # not yet used
     return parser
 
@@ -47,17 +48,19 @@ def main():
     env = BanditEnv(num_actions=args.num_actions)
 
     # create learning system.
-    policy_net = PolicyNetworkMAB(num_actions=args.num_actions)
-    value_net = ValueNetworkMAB(num_actions=args.num_actions)
+    policy_net = PolicyNetworkLSTM(num_actions=args.num_actions)
+    value_net = ValueNetworkLSTM(num_actions=args.num_actions)
 
-    policy_optimizer = tc.optim.Adam(
+    policy_optimizer = tc.optim.AdamW(
         params=policy_net.parameters(),
         lr=args.adam_lr,
-        eps=args.adam_eps)
-    value_optimizer = tc.optim.Adam(
+        eps=args.adam_eps,
+        weight_decay=args.adam_wd)
+    value_optimizer = tc.optim.AdamW(
         params=value_net.parameters(),
         lr=args.adam_lr,
-        eps=args.adam_eps)
+        eps=args.adam_eps,
+        weight_decay=args.adam_wd)
 
     policy_scheduler = None
     value_scheduler = None

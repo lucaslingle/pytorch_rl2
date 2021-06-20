@@ -8,7 +8,7 @@ from functools import partial
 
 import torch as tc
 
-from rl2.agents.mdp_agent import PolicyNetworkMDP, ValueNetworkMDP
+from rl2.agents.mdp_agent import PolicyNetworkLSTM, ValueNetworkLSTM
 from rl2.envs.mdp_env import MDPEnv
 from rl2.algos.ppo import training_loop
 
@@ -37,6 +37,7 @@ def create_argparser():
     parser.add_argument("--gae_lambda", type=float, default=0.3)
     parser.add_argument("--adam_lr", type=float, default=1e-4)
     parser.add_argument("--adam_eps", type=float, default=1e-3)
+    parser.add_argument("--adam_wd", type=float, default=1e-5)
     parser.add_argument("--experiment_seed", type=int, default=0) # not yet used
     return parser
 
@@ -52,21 +53,23 @@ def main():
         max_episode_length=args.episode_len)
 
     # create learning system.
-    policy_net = PolicyNetworkMDP(
+    policy_net = PolicyNetworkLSTM(
         num_states=args.num_states,
         num_actions=args.num_actions)
-    value_net = ValueNetworkMDP(
+    value_net = ValueNetworkLSTM(
         num_states=args.num_states,
         num_actions=args.num_actions)
 
-    policy_optimizer = tc.optim.Adam(
+    policy_optimizer = tc.optim.AdamW(
         params=policy_net.parameters(),
         lr=args.adam_lr,
-        eps=args.adam_eps)
-    value_optimizer = tc.optim.Adam(
+        eps=args.adam_eps,
+        weight_decay=args.adam_wd)
+    value_optimizer = tc.optim.AdamW(
         params=value_net.parameters(),
         lr=args.adam_lr,
-        eps=args.adam_eps)
+        eps=args.adam_eps,
+        weight_decay=args.adam_wd)
 
     policy_scheduler = None
     value_scheduler = None

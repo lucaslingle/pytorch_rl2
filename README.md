@@ -102,5 +102,6 @@ Note that in our case, we use PPO instead of TRPO, and we report peak performanc
 but not always identical to, final performance. 
 
 In all cases, we used a configuration where the total number of observations per policy improvement phase was equal to 240,000. 
-The per-process batch size was 60 trajectories. There were 8 processes. There were 200 gradient steps per policy improvement phase. 
-To stabilize training, we used the Adam hyperparameters from [Kapturowski et al., 2019](https://openreview.net/pdf?id=r1lyTjAqYX). 
+The per-process batch size was 60 trajectories for the bandit problems and 100 trajectories for the MDP problems. There were 8 processes. 
+There were 200 gradient steps per policy improvement phase. To stabilize training, we used the Adam hyperparameters from 
+[Kapturowski et al., 2019](https://openreview.net/pdf?id=r1lyTjAqYX). 
