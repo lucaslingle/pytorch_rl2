@@ -81,7 +81,7 @@ you can set the ```--checkpoint_dir``` flag, and to pick a different checkpoint 
 |  n=10,k=5  |    5.0 |     6.6 |   5.7 |   6.5 |   6.7 |        6.6 |    6.6 |          6.7 |         6.7 |
 |  n=10,k=10 |    5.0 |     6.6 |   5.5 |   6.2 |   6.7 |        6.6 |    6.6 |          6.7 |             |
 |  n=10,k=50 |    5.1 |     6.5 |   5.2 |   5.5 |   6.6 |        6.5 |    6.5 |          6.8 |             |
-| n=100,k=5  |   49.9 |    78.3 |  74.7 |  77.9 |  78.0 |       75.4 |   74.8 |         78.7 |        78.7 |
+| n=100,k=5  |   49.9 |    78.3 |  74.7 |  77.9 |  78.0 |       75.4 |   74.8 |         78.7 |             |
 | n=100,k=10 |   49.9 |    82.8 |  76.7 |  81.4 |  82.4 |       77.4 |   77.1 |         83.5 |             |
 | n=100,k=50 |   49.8 |    85.2 |  64.5 |  67.7 |  84.3 |       78.3 |   78.0 |         84.9 |             |
 | n=500,k=5  |  249.8 |   405.8 | 402.0 | 406.7 | 405.8 |      388.2 |  380.6 |        401.6 |             |
@@ -98,10 +98,10 @@ you can set the ```--checkpoint_dir``` flag, and to pick a different checkpoint 
 | n=75       |  749.9 | 1417.1 | 1449.2 | 1427.6 | 1422.6 |     1293.9 | 1172.9 |       1428.8 |             |
 | n=100      |  999.4 | 1939.5 | 1973.9 | 1942.1 | 1935.1 |     1778.2 | 1578.5 |       1913.7 |             |
 
-Note that in our case, we use PPO instead of TRPO, and we report peak performance over training. This was always similar to, 
-but not always identical to, final performance. 
+Note that in our case, we use PPO instead of TRPO, and use an LSTM instead of GRU. We report peak performance over training.
 
 In all cases, we used a configuration where the total number of observations per policy improvement phase was equal to 240,000. 
-The per-process batch size was 60 trajectories for the bandit problems and 100 trajectories for the MDP problems. There were 8 processes. 
-There were 200 gradient steps per policy improvement phase. To stabilize training, we used the Adam hyperparameters from 
-[Kapturowski et al., 2019](https://openreview.net/pdf?id=r1lyTjAqYX). 
+The per-process batch size was 60 trajectories. There were 8 processes. There were 200 gradient steps per policy improvement phase. 
+
+To stabilize training, we used the Adam hyperparameters from [Kapturowski et al., 2019](https://openreview.net/pdf?id=r1lyTjAqYX). 
+Trained used the decoupled weight decay regularization technique from [Hutter and Loschilov, 2017](https://arxiv.org/abs/1711.05101), with decay 1e-6. 
