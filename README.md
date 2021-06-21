@@ -104,4 +104,4 @@ In all cases, we used a configuration where the total number of observations per
 The per-process batch size was 60 trajectories. There were 8 processes. There were 200 gradient steps per policy improvement phase. 
 
 To stabilize training, we used the Adam hyperparameters from [Kapturowski et al., 2019](https://openreview.net/pdf?id=r1lyTjAqYX). 
-Trained used the decoupled weight decay regularization technique from [Hutter and Loschilov, 2017](https://arxiv.org/abs/1711.05101), with decay 1e-6. 
+Trained used the decoupled weight decay regularization technique from [Loshchilov and Hutter, 2017](https://arxiv.org/abs/1711.05101), with decay 1e-6. 
