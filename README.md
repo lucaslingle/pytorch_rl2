@@ -60,15 +60,16 @@ pip install -e .
 ### Training
 To train the default settings, you can simply type:
 ```bash
-mpirun -np 8 python -m train
+mpirun -np 8 python -m train_mdp
 ```
 
-This will launch 8 parallel processes, each running the ```train.py``` script. These processes will progress through several meta-episodes of distinct MDPs in parallel, and communicate gradient information and synchronize parameters using [OpenMPI](https://www.open-mpi.org/).
+This will launch 8 parallel processes, each running the ```train_mdp.py``` script. These processes will progress through several meta-episodes of distinct MDPs in parallel, and communicate gradient information and synchronize parameters using [OpenMPI](https://www.open-mpi.org/).
+Likewise you can run ```train_bandit.py``` by substituting ```train_bandit``` for ```train_mdp``` in the command above. 
 
 To see additional options, you can simply type ```python train.py --help```. 
 
 ### Checkpoints
-By default, checkpoints are saved to ```./checkpoints/defaults```. To pick a different checkpoint directory, 
+By default, checkpoints are saved to ```./checkpoints/defaults```. To pick a different checkpoint directory during training, 
 you can set the ```--checkpoint_dir``` flag, and to pick a different checkpoint name, you can set the 
 ```--model_name``` flag.
 
