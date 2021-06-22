@@ -8,7 +8,7 @@ from functools import partial
 
 import torch as tc
 
-from rl2.agents.bandit_agent import PolicyNetworkLSTM, ValueNetworkLSTM
+from rl2.agents.bandit_agent import PolicyNetworkGRU, ValueNetworkGRU
 from rl2.envs.bandit_env import BanditEnv
 from rl2.algos.ppo import training_loop
 
@@ -20,7 +20,7 @@ from rl2.utils.constants import ROOT_RANK
 def create_argparser():
     parser = argparse.ArgumentParser(
         description="""Training script for RL^2 bandit agent.""")
-    parser.add_argument("--max_pol_iters", type=int, default=300)
+    parser.add_argument("--max_pol_iters", type=int, default=600)
     parser.add_argument("--num_actions", type=int, default=5)
     parser.add_argument("--model_name", type=str, default='defaults')
     parser.add_argument("--checkpoint_dir", type=str, default='checkpoints')
@@ -35,7 +35,6 @@ def create_argparser():
     parser.add_argument("--gae_lambda", type=float, default=0.3)
     parser.add_argument("--adam_lr", type=float, default=1e-4)
     parser.add_argument("--adam_eps", type=float, default=1e-3)
-    parser.add_argument("--adam_wd", type=float, default=1e-6)
     parser.add_argument("--experiment_seed", type=int, default=0) # not yet used
     return parser
 
@@ -48,19 +47,17 @@ def main():
     env = BanditEnv(num_actions=args.num_actions)
 
     # create learning system.
-    policy_net = PolicyNetworkLSTM(num_actions=args.num_actions)
-    value_net = ValueNetworkLSTM(num_actions=args.num_actions)
+    policy_net = PolicyNetworkGRU(num_actions=args.num_actions)
+    value_net = ValueNetworkGRU(num_actions=args.num_actions)
 
-    policy_optimizer = tc.optim.AdamW(
+    policy_optimizer = tc.optim.Adam(
         params=policy_net.parameters(),
         lr=args.adam_lr,
-        eps=args.adam_eps,
-        weight_decay=args.adam_wd)
-    value_optimizer = tc.optim.AdamW(
+        eps=args.adam_eps)
+    value_optimizer = tc.optim.Adam(
         params=value_net.parameters(),
         lr=args.adam_lr,
-        eps=args.adam_eps,
-        weight_decay=args.adam_wd)
+        eps=args.adam_eps)
 
     policy_scheduler = None
     value_scheduler = None
