@@ -17,9 +17,10 @@ This stateful agent can be provided its previous action and the resulting immedi
 The agent's hidden state is believed to approximate sufficient statistics for the belief of which MDP the agent is in [[4]](https://arxiv.org/abs/1905.03030).
 This hidden state guides the agent's learning and behavior in the new environment. 
 
-In practice, maximizing this objective leads to policies which can explore a new environment to learn relevant information to obtain more reward.
-This occurs for exploratory actions that lead the agent to an information state in which it can better exploit the environment. 
-A simplified explanation is that these information states have higher value, and this value is backed up to the exploratory action. 
+In practice, maximizing this objective tends to lead to policies that can explore a new environment to learn relevant information to obtain more reward.
+Intuitively, there may be some exploratory actions that tend to lead the agent to information states from which it can better exploit the environment. 
+If in expectation the immediate reward plus the next information state has higher value than the previous information state, and if the parametrized value function equals the true value function, 
+then the expectation the advantage of the action is positive, so an increase in the probability of the exploratory action under the policy is encouraged by the training process. 
 
 Through such exploration, the agent can acquire the relevant information and transition from a highly exploratory policy to a highly exploitative policy purely through changes in its hidden state.
 
@@ -71,3 +72,50 @@ By default, checkpoints are saved to ```./checkpoints/defaults```. To pick a dif
 you can set the ```--checkpoint_dir``` flag, and to pick a different checkpoint name, you can set the 
 ```--model_name``` flag.
 
+## Reproducing the Paper
+
+### Bandit case:
+
+| Setup      | Random | Gittins |    TS |   OTS |  UCB1 | eps-Greedy | Greedy | RL^2 (paper) | RL^2 (ours) |
+| ---------- | ------ | ------- | ----- | ----- | ----- | ---------- | ------ | ------------ | ----------- | 
+|  n=10,k=5  |    5.0 |     6.6 |   5.7 |   6.5 |   6.7 |        6.6 |    6.6 |          6.7 |         6.7 |
+|  n=10,k=10 |    5.0 |     6.6 |   5.5 |   6.2 |   6.7 |        6.6 |    6.6 |          6.7 |             |
+|  n=10,k=50 |    5.1 |     6.5 |   5.2 |   5.5 |   6.6 |        6.5 |    6.5 |          6.8 |             |
+| n=100,k=5  |   49.9 |    78.3 |  74.7 |  77.9 |  78.0 |       75.4 |   74.8 |         78.7 |        78.7 |
+| n=100,k=10 |   49.9 |    82.8 |  76.7 |  81.4 |  82.4 |       77.4 |   77.1 |         83.5 |             |
+| n=100,k=50 |   49.8 |    85.2 |  64.5 |  67.7 |  84.3 |       78.3 |   78.0 |         84.9 |             |
+| n=500,k=5  |  249.8 |   405.8 | 402.0 | 406.7 | 405.8 |      388.2 |  380.6 |        401.6 |             |
+| n=500,k=10 |  249.0 |   437.8 | 429.5 | 438.9 | 437.1 |      408.0 |  395.0 |        432.5 |             |
+| n=500,k=50 |  249.6 |   463.7 | 427.2 | 437.6 | 457.6 |      413.6 |  402.8 |        438.9 |             |
+
+### MDP case:
+
+| Setup      | Random |   PSRL |  OPSRL |  UCRL2 |    BEB | eps-Greedy | Greedy | RL^2 (paper) | RL^2 (ours) |
+| ---------- | ------ | ------ | ------ | ------ | ------ | ---------- | ------ | ------------ | ----------- |
+| n=10       |  100.1 |  138.1 |  144.1 |  146.6 |  150.2 |      132.8 |  134.8 |        156.2 |       128.2 |
+| n=25       |  250.2 |  408.8 |  425.2 |  424.1 |  427.8 |      377.3 |  368.8 |        445.7 |             |
+| n=50       |  499.7 |  904.4 |  930.7 |  918.9 |  917.8 |      823.3 |  769.3 |        936.1 |             |
+| n=75       |  749.9 | 1417.1 | 1449.2 | 1427.6 | 1422.6 |     1293.9 | 1172.9 |       1428.8 |             |
+| n=100      |  999.4 | 1939.5 | 1973.9 | 1942.1 | 1935.1 |     1778.2 | 1578.5 |       1913.7 |             |
+
+Note that in our case, we use PPO instead of TRPO and we report peak performance over training.
+
+In all cases, we used a configuration where the total number of observations per policy improvement phase was equal to 240,000. 
+The per-process batch size was 60 trajectories. There were 8 processes. There were 200 gradient steps per policy improvement phase. 
+
+To stabilize training, we used the Adam hyperparameters from [Kapturowski et al., 2019](https://openreview.net/pdf?id=r1lyTjAqYX).
+
+## Official Project Hiatus
+
+In all cases, we observed training with PPO was slower than the training results reported by Duan et al., 2016, which used TRPO instead. 
+
+For the bandit problems, we found it took more than 600 policy improvement iterations to reach the performance level reported by Duan et al., 2016 in just 300 TRPO iterations.
+For the first MDP problem, we found that it took more than 600 policy improvement iterations to reach a peak performance of 128.2, whereas Duan et al., 2016 reached a performance of more than 144.1 in less than 500 TRPO iterations, and then reached a final performance of 156.2. 
+
+In all cases, we found the architecture from Duan et al., 2016 outperformed a standard LSTM. 
+Notably, this architecture uses weight normalization, and which could be a contributing factor in the slow training via PPO+Adam. 
+Our high Adam epsilon (1e-3) is also likely to blame, but we found training was unstable with epsilons of lower magnitude (1e-4,1e-5,1e-8). 
+Our Adam learning rate is already quite low (alpha=1e-4), and we did not observe any improvements from a lower learning rates (5e-5,1e-5).
+
+Since each experiment takes a long time to run, we believe the most time-effective solution would be to implement TRPO in Pytorch for recurrent architectures, and then to apply this result to RL^2. 
+We will return to this project once we have taken the time to obtain a satisfactory implementation of TRPO.    

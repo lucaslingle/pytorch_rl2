@@ -46,7 +46,16 @@ class PolicyHead(tc.nn.Module):
             output_dim=self.num_actions,
             gain_init=0.01)
 
-    def forward(self, features):  # pylint: disable=C0116
+    def forward(self, features: tc.FloatTensor) -> tc.distributions.Categorical:
+        """
+        Compute a policy distributions from features and return it.
+
+        Args:
+            features: a tc.FloatTensor of features of shape [B, feature_dim].
+
+        Returns:
+            a tc.distributions.Categorical over actions, with batch shape [B].
+        """
         logits = self.linear(features)
         dist = tc.distributions.Categorical(logits=logits)
         return dist
@@ -65,6 +74,36 @@ class ValueHead(tc.nn.Module):
             output_dim=1,
             gain_init=1.0)
 
-    def forward(self, features):  # pylint: disable=C0116
+    def forward(self, features: tc.FloatTensor) -> tc.FloatTensor:
+        """
+        Compute a policy distributions from features and return it.
+
+        Args:
+            features: a tc.FloatTensor of features with shape [B, feature_dim].
+
+        Returns:
+            a tc.FloatTensor of value estimates with shape [B].
+        """
         v_pred = self.linear(features).squeeze(-1)
         return v_pred
+
+
+def one_hot(ys: tc.LongTensor, depth: int) -> tc.FloatTensor:
+    """
+    Applies one-hot encoding to a batch of vectors.
+
+    Args:
+        ys: tc.LongTensor of shape [B].
+        depth: int specifying the number of possible label values.
+
+    Returns:
+        one-hot encodings of ys.
+    """
+
+    batch_size = ys.shape[0]
+    vecs_shape = [batch_size, depth]
+    vecs = tc.zeros(dtype=tc.float32, size=vecs_shape)
+    vecs.scatter_(dim=1, index=ys.unsqueeze(-1),
+                  src=tc.ones(dtype=tc.float32, size=vecs_shape))
+    return vecs
+
