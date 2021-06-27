@@ -119,4 +119,4 @@ Our high Adam epsilon (1e-3) is also likely to blame, but we found training was 
 Our Adam learning rate is already quite low (alpha=1e-4), and we did not observe any improvements from a lower learning rates (5e-5,1e-5).
 
 Since each experiment takes a long time to run, we believe the most time-effective solution would be to implement TRPO in Pytorch for recurrent architectures, and then to apply this result to RL^2. 
-We will return to this project once we have taken the time to obtain a satisfactory implementation of TRPO.    
+We will return to this project once we have taken the time to obtain a satisfactory implementation of TRPO.

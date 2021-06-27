@@ -8,8 +8,14 @@ from typing import Tuple
 import torch as tc
 
 from rl2.agents.abstract import StatefulPolicyNet, StatefulValueNet
-from rl2.agents.models import DuanGRU, LSTM, lstm_postprocessing
-from rl2.agents.common import one_hot, PolicyHead, ValueHead
+from rl2.agents.common import (
+    one_hot,
+    lstm_postprocessing,
+    DuanGRU,
+    LSTM,
+    PolicyHead,
+    ValueHead
+)
 
 
 def mdp_preprocessing(

@@ -8,8 +8,14 @@ from typing import Tuple
 import torch as tc
 
 from rl2.agents.abstract import StatefulPolicyNet, StatefulValueNet
-from rl2.agents.models import DuanGRU, LSTM, lstm_postprocessing
-from rl2.agents.common import one_hot, PolicyHead, ValueHead
+from rl2.agents.common import (
+    one_hot,
+    lstm_postprocessing,
+    DuanGRU,
+    LSTM,
+    PolicyHead,
+    ValueHead
+)
 
 
 def bandit_preprocessing(
@@ -36,7 +42,7 @@ class PolicyNetworkGRU(StatefulPolicyNet):
         self._feature_dim = 256
         self._initial_state = tc.zeros(self._feature_dim)
         self._memory = DuanGRU(
-            input_dim=(self._num_actions+2),
+            input_dim=self._num_actions+2,
             hidden_dim=self._feature_dim)
         self._policy_head = PolicyHead(
             feature_dim=self._feature_dim,
