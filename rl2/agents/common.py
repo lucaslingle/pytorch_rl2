@@ -23,8 +23,7 @@ class WeightNormedLinear(tc.nn.Module):
         self._use_bias = use_bias
 
         weights = tc.nn.Parameter(
-            tc.empty(
-                output_dim, input_dim, requires_grad=True).type(tc.FloatTensor)
+            tc.empty(output_dim, input_dim, device='cpu')
         )
         self._weights = weight_initializer(weights)
 
@@ -34,7 +33,7 @@ class WeightNormedLinear(tc.nn.Module):
 
         if self._use_bias:
             biases = tc.nn.Parameter(
-                tc.empty(output_dim, requires_grad=True).type(tc.FloatTensor)
+                tc.empty(output_dim, device='cpu')
             )
             self._biases = tc.nn.init.zeros_(biases)
 
