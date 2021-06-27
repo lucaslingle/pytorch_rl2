@@ -22,20 +22,17 @@ class WeightNormedLinear(tc.nn.Module):
         super().__init__()
         self._use_bias = use_bias
 
-        weights = tc.nn.Parameter(
-            tc.empty(output_dim, input_dim, device='cpu')
-        )
-        self._weights = weight_initializer(weights)
+        weights = tc.empty(output_dim, input_dim, device='cpu')
+        weights = weight_initializer(weights)
+        self._weights = tc.nn.Parameter(weights)
 
-        self._gains = tc.nn.Parameter(
-            tc.sqrt(tc.sum(tc.square(self._weights.detach()), dim=-1))
-        )
+        gains = tc.sqrt(tc.sum(tc.square(self._weights.detach()), dim=-1))
+        self._gains = tc.nn.Parameter(gains)
 
         if self._use_bias:
-            biases = tc.nn.Parameter(
-                tc.empty(output_dim, device='cpu')
-            )
-            self._biases = tc.nn.init.zeros_(biases)
+            biases = tc.empty(output_dim, device='cpu')
+            biases = tc.nn.init.zeros_(biases)
+            self._biases = tc.nn.Parameter(biases)
 
     def forward(self, x):
         weight_norms = tc.sqrt(tc.sum(tc.square(self._weights), dim=-1))
