@@ -22,6 +22,8 @@ def create_argparser():
         description="""Training script for RL^2 bandit agent.""")
     parser.add_argument("--max_pol_iters", type=int, default=600)
     parser.add_argument("--num_actions", type=int, default=5)
+    parser.add_argument("--num_features", type=int, default=256)
+    parser.add_argument("--use_wn", type=int, choices=[0,1], default=1)
     parser.add_argument("--model_name", type=str, default='defaults')
     parser.add_argument("--checkpoint_dir", type=str, default='checkpoints')
     parser.add_argument("--checkpoint_interval", type=int, default=10)
@@ -47,8 +49,14 @@ def main():
     env = BanditEnv(num_actions=args.num_actions)
 
     # create learning system.
-    policy_net = PolicyNetworkGRU(num_actions=args.num_actions)
-    value_net = ValueNetworkGRU(num_actions=args.num_actions)
+    policy_net = PolicyNetworkGRU(
+        num_actions=args.num_actions,
+        num_features=args.num_features,
+        use_wn=bool(args.use_wn))
+    value_net = ValueNetworkGRU(
+        num_actions=args.num_actions,
+        num_features=args.num_features,
+        use_wn=bool(args.use_wn))
 
     policy_optimizer = tc.optim.Adam(
         params=policy_net.parameters(),

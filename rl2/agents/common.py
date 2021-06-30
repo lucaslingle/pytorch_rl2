@@ -8,26 +8,29 @@ from typing import Tuple
 import torch as tc
 
 
-class WeightNormedLinear(tc.nn.Module):
+class Linear(tc.nn.Module):
     """
-    A linear layer with weight normalization included.
+    A linear layer with optional weight normalization included.
     """
     def __init__(
         self,
         input_dim,
         output_dim,
         weight_initializer,
-        use_bias=True,
+        use_wn=True,
+        use_bias=True
     ):
         super().__init__()
+        self._use_wn = use_wn
         self._use_bias = use_bias
 
         weights = tc.empty(output_dim, input_dim, device='cpu')
         weights = weight_initializer(weights)
         self._weights = tc.nn.Parameter(weights)
 
-        gains = tc.sqrt(tc.sum(tc.square(self._weights.detach()), dim=-1))
-        self._gains = tc.nn.Parameter(gains)
+        if self._use_wn:
+            gains = tc.sqrt(tc.sum(tc.square(self._weights.detach()), dim=-1))
+            self._gains = tc.nn.Parameter(gains)
 
         if self._use_bias:
             biases = tc.empty(output_dim, device='cpu')
@@ -35,12 +38,18 @@ class WeightNormedLinear(tc.nn.Module):
             self._biases = tc.nn.Parameter(biases)
 
     def forward(self, x):
-        weight_norms = tc.sqrt(tc.sum(tc.square(self._weights), dim=-1))
-        normed_weights = self._weights / weight_norms.unsqueeze(-1)
-        output = tc.einsum(
-            'o,bo->bo', self._gains, tc.einsum('oi,bi->bo', normed_weights, x))
+        if self._use_wn:
+            weight_norms = tc.sqrt(tc.sum(tc.square(self._weights), dim=-1))
+            w = self._weights / weight_norms.unsqueeze(-1)
+            output = tc.einsum(
+                'o,bo->bo', self._gains, tc.einsum('oi,bi->bo', w, x))
+        else:
+            w = self._weights
+            output = tc.einsum('oi,bi->bo', w, x)
+
         if self._use_bias:
             output += self._biases.unsqueeze(0)
+
         return output
 
 
@@ -68,42 +77,49 @@ class DuanGRU(tc.nn.Module):
     """
     GRU from Duan et al., 2016.
     """
-    def __init__(self, input_dim, hidden_dim):
+    def __init__(self, input_dim, hidden_dim, use_wn=True):
         super().__init__()
         self._input_dim = input_dim
         self._hidden_dim = hidden_dim
+        self._use_wn = use_wn
 
-        self._x2z = WeightNormedLinear(
+        self._x2z = Linear(
             input_dim=self._input_dim,
             output_dim=self._hidden_dim,
             weight_initializer=tc.nn.init.xavier_normal_,
+            use_wn=self._use_wn,
             use_bias=False)
-        self._h2z = WeightNormedLinear(
+        self._h2z = Linear(
             input_dim=self._hidden_dim,
             output_dim=self._hidden_dim,
             weight_initializer=tc.nn.init.xavier_normal_,
+            use_wn=self._use_wn,
             use_bias=True)
 
-        self._x2r = WeightNormedLinear(
+        self._x2r = Linear(
             input_dim=self._input_dim,
             output_dim=self._hidden_dim,
             weight_initializer=tc.nn.init.xavier_normal_,
+            use_wn=self._use_wn,
             use_bias=False)
-        self._h2r = WeightNormedLinear(
+        self._h2r = Linear(
             input_dim=self._hidden_dim,
             output_dim=self._hidden_dim,
             weight_initializer=tc.nn.init.xavier_normal_,
+            use_wn=self._use_wn,
             use_bias=True)
 
-        self._x2hhat = WeightNormedLinear(
+        self._x2hhat = Linear(
             input_dim=self._input_dim,
             output_dim=self._hidden_dim,
             weight_initializer=tc.nn.init.xavier_normal_,
+            use_wn=self._use_wn,
             use_bias=False)
-        self._rh2hhat = WeightNormedLinear(
+        self._rh2hhat = Linear(
             input_dim=self._hidden_dim,
             output_dim=self._hidden_dim,
             weight_initializer=tc.nn.init.orthogonal_,
+            use_wn=self._use_wn,
             use_bias=True)
 
     def forward(
@@ -134,16 +150,18 @@ class LSTM(tc.nn.Module):
     """
     LSTM.
     """
-    def __init__(self, input_dim, hidden_dim):
+    def __init__(self, input_dim, hidden_dim, use_wn=False):
         super().__init__()
         self._input_dim = input_dim
         self._hidden_dim = hidden_dim
+        self._use_wn = use_wn
 
-        self._linear = tc.nn.Linear(
-            (self._input_dim + self._hidden_dim), 4 * self._hidden_dim)
-
-        tc.nn.init.uniform_(self._linear.weight, -0.10, 0.10),
-        tc.nn.init.zeros_(self._linear.bias)
+        self._linear = Linear(
+            input_dim=(self._input_dim + self._hidden_dim),
+            output_dim=(4 * self._hidden_dim),
+            weight_initializer=lambda m: tc.nn.init.uniform_(m, -0.10, 0.10),
+            use_wn=self._use_wn,
+            use_bias=True)
 
     def forward(
         self,
@@ -185,25 +203,27 @@ class PolicyHead(tc.nn.Module):
     Policy head for a reinforcement learning agent.
     Uses a weight-normed linear layer.
     """
-    def __init__(self, feature_dim, num_actions):
+    def __init__(self, num_features, num_actions, use_wn=True):
         super().__init__()
-        self.feature_dim = feature_dim
-        self.num_actions = num_actions
-        self.linear = WeightNormedLinear(
-            input_dim=self.feature_dim,
-            output_dim=self.num_actions,
+        self._num_features = num_features
+        self._num_actions = num_actions
+        self._use_wn = use_wn
+        self._linear = Linear(
+            input_dim=self._num_features,
+            output_dim=self._num_actions,
             weight_initializer=tc.nn.init.xavier_normal_,
+            use_wn=self._use_wn,
             use_bias=True)
 
     def forward(self, features: tc.FloatTensor) -> tc.distributions.Categorical:
         """
         Computes a policy distributions from features and returns it.
         Args:
-            features: a tc.FloatTensor of features of shape [B, feature_dim].
+            features: a tc.FloatTensor of features of shape [B, num_features].
         Returns:
             a tc.distributions.Categorical over actions, with batch shape [B].
         """
-        logits = self.linear(features)
+        logits = self._linear(features)
         dist = tc.distributions.Categorical(logits=logits)
         return dist
 
@@ -213,22 +233,24 @@ class ValueHead(tc.nn.Module):
     Value head for a reinforcement learning agent.
     Uses a weight-normed linear layer.
     """
-    def __init__(self, feature_dim):
+    def __init__(self, num_features, use_wn=True):
         super().__init__()
-        self.feature_dim = feature_dim
-        self.linear = WeightNormedLinear(
-            input_dim=self.feature_dim,
+        self._num_features = num_features
+        self._use_wn = use_wn
+        self._linear = Linear(
+            input_dim=self._num_features,
             output_dim=1,
             weight_initializer=tc.nn.init.xavier_normal_,
+            use_wn=self._use_wn,
             use_bias=True)
 
     def forward(self, features: tc.FloatTensor) -> tc.FloatTensor:
         """
         Computes a value estimate from features and returns it.
         Args:
-            features: a tc.FloatTensor of features with shape [B, feature_dim].
+            features: a tc.FloatTensor of features with shape [B, num_features].
         Returns:
             a tc.FloatTensor of value estimates with shape [B].
         """
-        v_pred = self.linear(features).squeeze(-1)
+        v_pred = self._linear(features).squeeze(-1)
         return v_pred
