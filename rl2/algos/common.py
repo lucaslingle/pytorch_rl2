@@ -136,3 +136,15 @@ def assign_credit(
 
     meta_episode.tdlam_rets = meta_episode.vpreds + meta_episode.advs
     return meta_episode
+
+
+def huber_func(y_pred, y_true, delta=1.0):
+    a = y_pred-y_true
+    a_abs = tc.abs(a)
+    a2 = tc.square(a)
+    terms = tc.where(
+        tc.less(a_abs, tc.ones_like(a2)),
+        0.5 * a2,
+        delta * (a_abs - 0.5 * delta)
+    )
+    return terms
