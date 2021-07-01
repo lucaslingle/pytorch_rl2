@@ -143,7 +143,7 @@ def huber_func(y_pred, y_true, delta=1.0):
     a_abs = tc.abs(a)
     a2 = tc.square(a)
     terms = tc.where(
-        tc.less(a_abs, tc.ones_like(a2)),
+        tc.less(a_abs, delta * tc.ones_like(a2)),
         0.5 * a2,
         delta * (a_abs - 0.5 * delta)
     )
