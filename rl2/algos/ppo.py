@@ -12,7 +12,12 @@ from mpi4py import MPI
 
 from rl2.agents.abstract import StatefulPolicyNet, StatefulValueNet
 from rl2.envs.abstract import MetaEpisodicEnv
-from rl2.algos.common import MetaEpisode, generate_meta_episode, assign_credit
+from rl2.algos.common import (
+    MetaEpisode,
+    generate_meta_episode,
+    assign_credit,
+    huber_func,
+)
 from rl2.utils.comm_util import sync_grads
 from rl2.utils.constants import ROOT_RANK
 
@@ -119,7 +124,8 @@ def compute_losses(
     policy_loss = -(policy_surrogate_objective + policy_entropy_bonus)
 
     # value loss
-    value_loss = tc.mean(tc.square(mb_tdlam_rets - vpreds_new))
+    #value_loss = tc.mean(tc.square(mb_tdlam_rets - vpreds_new))
+    value_loss = tc.mean(huber_func(mb_tdlam_rets, vpreds_new))
 
     # clipfrac
     clipfrac = tc.mean(tc.greater(surr1, surr2).float())

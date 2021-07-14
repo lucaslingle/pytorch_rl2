@@ -23,6 +23,8 @@ def create_argparser():
     parser.add_argument("--max_pol_iters", type=int, default=12000)
     parser.add_argument("--num_states", type=int, default=10)
     parser.add_argument("--num_actions", type=int, default=5)
+    parser.add_argument("--num_features", type=int, default=256)
+    parser.add_argument("--use_wn", type=int, choices=[0,1], default=0)
     parser.add_argument("--model_name", type=str, default='defaults')
     parser.add_argument("--checkpoint_dir", type=str, default='checkpoints')
     parser.add_argument("--checkpoint_interval", type=int, default=10)
@@ -30,13 +32,13 @@ def create_argparser():
     parser.add_argument("--episodes_per_meta_episode", type=int, default=10)
     parser.add_argument("--meta_episodes_per_policy_update", type=int, default=30000//100)
     parser.add_argument("--meta_episodes_per_actor_batch", type=int, default=60)
-    parser.add_argument("--ppo_opt_epochs", type=int, default=40)
+    parser.add_argument("--ppo_opt_epochs", type=int, default=8)
     parser.add_argument("--ppo_clip_param", type=float, default=0.10)
     parser.add_argument("--ppo_ent_coef", type=float, default=0.01)
     parser.add_argument("--discount_gamma", type=float, default=0.99)
     parser.add_argument("--gae_lambda", type=float, default=0.3)
-    parser.add_argument("--adam_lr", type=float, default=1e-4)
-    parser.add_argument("--adam_eps", type=float, default=1e-3)
+    parser.add_argument("--adam_lr", type=float, default=2e-4)
+    parser.add_argument("--adam_eps", type=float, default=1e-5)
     parser.add_argument("--experiment_seed", type=int, default=0) # not yet used
     return parser
 
@@ -54,10 +56,14 @@ def main():
     # create learning system.
     policy_net = PolicyNetworkGRU(
         num_states=args.num_states,
-        num_actions=args.num_actions)
+        num_actions=args.num_actions,
+        num_features=args.num_features,
+        use_wn=bool(args.use_wn))
     value_net = ValueNetworkGRU(
         num_states=args.num_states,
-        num_actions=args.num_actions)
+        num_actions=args.num_actions,
+        num_features=args.num_features,
+        use_wn=bool(args.use_wn))
 
     policy_optimizer = tc.optim.Adam(
         params=policy_net.parameters(),
