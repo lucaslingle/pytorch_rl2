@@ -36,7 +36,7 @@ class PolicyNetworkGRU(StatefulPolicyNet):
     """
     Policy network from Duan et al., 2016 for multi-armed bandit problems.
     """
-    def __init__(self, num_actions, num_features, use_wn, reset_after):
+    def __init__(self, num_actions, num_features, use_wn, reset_after=True):
         super().__init__()
         self._num_actions = num_actions
         self._num_features = num_features
@@ -178,7 +178,7 @@ class ValueNetworkGRU(StatefulValueNet):
     """
     Value network from Duan et al., 2016 for multi-armed bandit problems.
     """
-    def __init__(self, num_actions, num_features, use_wn, reset_after):
+    def __init__(self, num_actions, num_features, use_wn, reset_after=True):
         super().__init__()
         self._num_actions = num_actions
         self._num_features = num_features
@@ -188,7 +188,8 @@ class ValueNetworkGRU(StatefulValueNet):
         self._memory = DuanGRU(
             input_dim=self._num_actions+2,
             hidden_dim=self._num_features,
-            use_wn=self._use_wn)
+            use_wn=self._use_wn,
+            reset_after=self._reset_after)
 
         self._value_head = ValueHead(
             num_features=self._num_features)
