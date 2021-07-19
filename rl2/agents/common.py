@@ -77,50 +77,51 @@ class DuanGRU(tc.nn.Module):
     """
     GRU from Duan et al., 2016.
     """
-    def __init__(self, input_dim, hidden_dim, use_wn=True):
+    def __init__(self, input_dim, hidden_dim, use_wn=True, reset_after=True):
         super().__init__()
         self._input_dim = input_dim
         self._hidden_dim = hidden_dim
         self._use_wn = use_wn
+        self._reset_after = reset_after
 
         self._x2z = Linear(
             input_dim=self._input_dim,
             output_dim=self._hidden_dim,
             weight_initializer=tc.nn.init.xavier_normal_,
             use_wn=self._use_wn,
-            use_bias=False)
+            use_bias=True)
         self._h2z = Linear(
             input_dim=self._hidden_dim,
             output_dim=self._hidden_dim,
             weight_initializer=tc.nn.init.xavier_normal_,
             use_wn=self._use_wn,
-            use_bias=True)
+            use_bias=False)
 
         self._x2r = Linear(
             input_dim=self._input_dim,
             output_dim=self._hidden_dim,
             weight_initializer=tc.nn.init.xavier_normal_,
             use_wn=self._use_wn,
-            use_bias=False)
+            use_bias=True)
         self._h2r = Linear(
             input_dim=self._hidden_dim,
             output_dim=self._hidden_dim,
             weight_initializer=tc.nn.init.xavier_normal_,
             use_wn=self._use_wn,
-            use_bias=True)
+            use_bias=False)
 
         self._x2hhat = Linear(
             input_dim=self._input_dim,
             output_dim=self._hidden_dim,
             weight_initializer=tc.nn.init.xavier_normal_,
             use_wn=self._use_wn,
-            use_bias=False)
-        self._rh2hhat = Linear(
+            use_bias=True)
+        self._h2hhat = Linear(
             input_dim=self._hidden_dim,
             output_dim=self._hidden_dim,
             weight_initializer=tc.nn.init.orthogonal_,
             use_wn=self._use_wn,
-            use_bias=True)
+            use_bias=False)
 
     def forward(
         self,
@@ -138,12 +139,14 @@ class DuanGRU(tc.nn.Module):
         """
         z = tc.nn.Sigmoid()(self._x2z(input_vec) + self._h2z(prev_state))
         r = tc.nn.Sigmoid()(self._x2r(input_vec) + self._h2r(prev_state))
-        hhat = tc.nn.ReLU()(
-            self._x2hhat(input_vec) + self._rh2hhat(r * prev_state))
-        h = (1. - z) * prev_state + z * hhat
-        new_state = h
-
-        return new_state
+        if self._reset_after:
+            hhat = tc.nn.ReLU()(
+                self._x2hhat(input_vec) + r * self._h2hhat(prev_state))
+        else:
+            hhat = tc.nn.ReLU()(
+                self._x2hhat(input_vec) + self._h2hhat(r * prev_state))
+        h_new = (1. - z) * prev_state + z * hhat
+        return h_new
 
 
 class LSTM(tc.nn.Module):
