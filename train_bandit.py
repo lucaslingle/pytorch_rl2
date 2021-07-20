@@ -35,6 +35,7 @@ def create_argparser():
     parser.add_argument("--ppo_ent_coef", type=float, default=0.01)
     parser.add_argument("--discount_gamma", type=float, default=0.99)
     parser.add_argument("--gae_lambda", type=float, default=0.3)
+    parser.add_argument("--standardize_advs", type=int, choices=[0,1], default=0)
     parser.add_argument("--adam_lr", type=float, default=2e-4)
     parser.add_argument("--adam_eps", type=float, default=1e-5)
     parser.add_argument("--experiment_seed", type=int, default=0) # not yet used
@@ -146,6 +147,7 @@ def main():
         ppo_ent_coef=args.ppo_ent_coef,
         discount_gamma=args.discount_gamma,
         gae_lambda=args.gae_lambda,
+        standardize_advs=bool(args.standardize_advs),
         max_pol_iters=args.max_pol_iters,
         pol_iters_so_far=pol_iters_so_far,
         policy_checkpoint_fn=policy_checkpoint_fn,

@@ -155,6 +155,7 @@ def training_loop(
         ppo_ent_coef: float,
         discount_gamma: float,
         gae_lambda: float,
+        standardize_advs: bool,
         max_pol_iters: int,
         pol_iters_so_far: int,
         policy_checkpoint_fn: Callable[[int], None],
@@ -183,6 +184,7 @@ def training_loop(
         ppo_ent_coef: entropy bonus coefficient for proximal policy optimization
         discount_gamma: discount factor gamma.
         gae_lambda: decay parameter lambda for generalized advantage estimation.
+        standardize_advs: standardize advantages to mean 0 and stddev 1?
         max_pol_iters: the maximum number policy improvements to make.
         pol_iters_so_far: the number of policy improvements made so far.
         policy_checkpoint_fn: a callback for saving checkpoints of policy net.
@@ -217,6 +219,30 @@ def training_loop(
             g_meta_ep_returns = comm.allgather(l_meta_ep_returns)
             g_meta_ep_returns = [x for loc in g_meta_ep_returns for x in loc]
             meta_ep_returns.extend(g_meta_ep_returns)
+
+        # maybe standardize advantages...
+        if standardize_advs:
+            num_procs = comm.Get_size()
+            adv_eps = 1e-8
+
+            l_advs = list(map(lambda m: m.advs, meta_episodes))
+            l_adv_mu = np.mean(l_advs)
+            g_adv_mu = comm.allreduce(l_adv_mu, op=MPI.SUM) / num_procs
+
+            l_advs_centered = list(map(lambda adv: adv - g_adv_mu, l_advs))
+            l_adv_sigma2 = np.var(l_advs_centered)
+            g_adv_sigma2 = comm.allreduce(l_adv_sigma2, op=MPI.SUM) / num_procs
+            g_adv_sigma = np.sqrt(g_adv_sigma2) + adv_eps
+
+            l_advs_standardized = list(map(lambda adv: adv / g_adv_sigma, l_advs_centered))
+            for m, a in zip(meta_episodes, l_advs_standardized):
+                setattr(m, 'advs', a)
+                setattr(m, 'tdlam_rets', m.vpreds + a)
+
+            if comm.Get_rank() == ROOT_RANK:
+                mean_adv_r0 = np.mean(
+                    list(map(lambda m: m.advs, meta_episodes)))
+                print(f"Mean advantage: {mean_adv_r0}")
 
         # update policy...
         for opt_epoch in range(ppo_opt_epochs):
