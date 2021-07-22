@@ -77,11 +77,15 @@ class DuanGRU(tc.nn.Module):
     """
     GRU from Duan et al., 2016.
     """
-    def __init__(self, input_dim, hidden_dim, use_wn=True, reset_after=True):
+    def __init__(
+            self, input_dim, hidden_dim, use_wn=True, forget_bias=1.0,
+            reset_after=True
+    ):
         super().__init__()
         self._input_dim = input_dim
         self._hidden_dim = hidden_dim
         self._use_wn = use_wn
+        self._forget_bias = forget_bias
         self._reset_after = reset_after
 
         self._x2z = Linear(
@@ -137,14 +141,18 @@ class DuanGRU(tc.nn.Module):
         Returns:
             new_state.
         """
-        z = tc.nn.Sigmoid()(self._x2z(input_vec) + self._h2z(prev_state))
-        r = tc.nn.Sigmoid()(self._x2r(input_vec) + self._h2r(prev_state))
+        z = tc.nn.Sigmoid()(
+            self._x2z(input_vec) + self._h2z(prev_state) - self._forget_bias)
+        r = tc.nn.Sigmoid()(
+            self._x2r(input_vec) + self._h2r(prev_state))
+
         if self._reset_after:
             hhat = tc.nn.ReLU()(
                 self._x2hhat(input_vec) + r * self._h2hhat(prev_state))
         else:
             hhat = tc.nn.ReLU()(
                 self._x2hhat(input_vec) + self._h2hhat(r * prev_state))
+
         h_new = (1. - z) * prev_state + z * hhat
         return h_new
 
@@ -153,10 +161,11 @@ class LSTM(tc.nn.Module):
     """
     LSTM.
     """
-    def __init__(self, input_dim, hidden_dim, use_wn=False):
+    def __init__(self, input_dim, hidden_dim, use_wn=False, forget_bias=1.0):
         super().__init__()
         self._input_dim = input_dim
         self._hidden_dim = hidden_dim
+        self._forget_bias = forget_bias
         self._use_wn = use_wn
 
         self._linear = Linear(
@@ -184,7 +193,7 @@ class LSTM(tc.nn.Module):
         vec = tc.cat((input_vec, hidden_vec), dim=-1)
         fioj = self._linear(vec)
         f, i, o, j = tc.chunk(fioj, 4, dim=-1)
-        f = tc.nn.Sigmoid()(f + 1.0)
+        f = tc.nn.Sigmoid()(f + self._forget_bias)
         i = tc.nn.Sigmoid()(i)
         o = tc.nn.Sigmoid()(o)
         j = tc.nn.Tanh()(j)

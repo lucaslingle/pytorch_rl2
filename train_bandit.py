@@ -24,6 +24,7 @@ def create_argparser():
     parser.add_argument("--num_actions", type=int, default=5)
     parser.add_argument("--num_features", type=int, default=256)
     parser.add_argument("--use_wn", type=int, choices=[0,1], default=0)
+    parser.add_argument("--forget_bias", type=float, default=1.0)
     parser.add_argument("--model_name", type=str, default='defaults')
     parser.add_argument("--checkpoint_dir", type=str, default='checkpoints')
     parser.add_argument("--checkpoint_interval", type=int, default=10)
@@ -54,12 +55,14 @@ def main():
         num_actions=args.num_actions,
         num_features=args.num_features,
         use_wn=bool(args.use_wn),
-        reset_after=False)
+        forget_bias=args.forget_bias,
+        reset_after=True)
     value_net = ValueNetworkGRU(
         num_actions=args.num_actions,
         num_features=args.num_features,
         use_wn=bool(args.use_wn),
-        reset_after=False)
+        forget_bias=args.forget_bias,
+        reset_after=True)
 
     policy_optimizer = tc.optim.Adam(
         params=policy_net.parameters(),

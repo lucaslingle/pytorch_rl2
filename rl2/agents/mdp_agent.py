@@ -41,7 +41,7 @@ class PolicyNetworkGRU(StatefulPolicyNet):
     Policy network from Duan et al., 2016 for MDPs.
     """
     def __init__(
-            self, num_states, num_actions, num_features, use_wn,
+            self, num_states, num_actions, num_features, use_wn, forget_bias,
             reset_after=True
     ):
         super().__init__()
@@ -49,12 +49,14 @@ class PolicyNetworkGRU(StatefulPolicyNet):
         self._num_actions = num_actions
         self._num_features = num_features
         self._use_wn = use_wn
+        self._forget_bias = forget_bias
         self._reset_after = reset_after
         self._initial_state = tc.zeros(self._num_features)
         self._memory = DuanGRU(
             input_dim=self._num_states+self._num_actions+2,
             hidden_dim=self._num_features,
             use_wn=self._use_wn,
+            forget_bias=self._forget_bias,
             reset_after=self._reset_after)
 
         self._policy_head = PolicyHead(
@@ -190,7 +192,7 @@ class ValueNetworkGRU(StatefulValueNet):
     Value network from Duan et al., 2016 for MDPs.
     """
     def __init__(
-            self, num_states, num_actions, num_features, use_wn,
+            self, num_states, num_actions, num_features, use_wn, forget_bias,
             reset_after=True
     ):
         super().__init__()
@@ -198,12 +200,14 @@ class ValueNetworkGRU(StatefulValueNet):
         self._num_actions = num_actions
         self._num_features = num_features
         self._use_wn = use_wn
+        self._forget_bias = forget_bias
         self._reset_after = reset_after
         self._initial_state = tc.zeros(self._num_features)
         self._memory = DuanGRU(
             input_dim=self._num_states+self._num_actions+2,
             hidden_dim=self._num_features,
             use_wn=self._use_wn,
+            forget_bias=self._forget_bias,
             reset_after=self._reset_after)
 
         self._value_head = ValueHead(
