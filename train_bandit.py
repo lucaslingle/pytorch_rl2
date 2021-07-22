@@ -54,12 +54,12 @@ def main():
         num_actions=args.num_actions,
         num_features=args.num_features,
         use_wn=bool(args.use_wn),
-        reset_after=True)
+        reset_after=False)
     value_net = ValueNetworkGRU(
         num_actions=args.num_actions,
         num_features=args.num_features,
         use_wn=bool(args.use_wn),
-        reset_after=True)
+        reset_after=False)
 
     policy_optimizer = tc.optim.Adam(
         params=policy_net.parameters(),

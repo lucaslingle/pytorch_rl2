@@ -66,7 +66,7 @@ mpirun -np 8 python -m train_mdp
 This will launch 8 parallel processes, each running the ```train_mdp.py``` script. These processes will progress through several meta-episodes of distinct MDPs in parallel, and communicate gradient information and synchronize parameters using [OpenMPI](https://www.open-mpi.org/).
 Likewise you can run ```train_bandit.py``` by substituting ```train_bandit``` for ```train_mdp``` in the command above. 
 
-To see additional options, you can simply type ```python train.py --help```. 
+To see additional configuration options, you can simply type ```python train_mdp.py --help```. To see these options for the bandit script, substitute ```train_bandit.py``` instead.  
 
 ### Checkpoints
 By default, checkpoints are saved to ```./checkpoints/defaults```. To pick a different checkpoint directory during training, 
