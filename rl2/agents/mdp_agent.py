@@ -41,14 +41,15 @@ class PolicyNetworkGRU(StatefulPolicyNet):
     Policy network from Duan et al., 2016 for MDPs.
     """
     def __init__(
-            self, num_states, num_actions, num_features, use_wn, forget_bias,
-            reset_after=True
+            self, num_states, num_actions, num_features, use_wn, use_ln,
+            forget_bias, reset_after=True
     ):
         super().__init__()
         self._num_states = num_states
         self._num_actions = num_actions
         self._num_features = num_features
         self._use_wn = use_wn
+        self._use_ln = use_ln
         self._forget_bias = forget_bias
         self._reset_after = reset_after
         self._initial_state = tc.zeros(self._num_features)
@@ -56,12 +57,14 @@ class PolicyNetworkGRU(StatefulPolicyNet):
             input_dim=self._num_states+self._num_actions+2,
             hidden_dim=self._num_features,
             use_wn=self._use_wn,
+            use_ln=self._use_ln,
             forget_bias=self._forget_bias,
             reset_after=self._reset_after)
 
         self._policy_head = PolicyHead(
             num_features=self._num_features,
-            num_actions=self._num_actions)
+            num_actions=self._num_actions,
+            use_wn=self._use_wn)
 
     def initial_state(self, batch_size: int) -> tc.FloatTensor:
         """
@@ -117,21 +120,24 @@ class PolicyNetworkLSTM(StatefulPolicyNet):
     """
     LSTM policy network for meta-reinforcement learning over MDPs.
     """
-    def __init__(self, num_states, num_actions, num_features, use_wn):
+    def __init__(self, num_states, num_actions, num_features, use_wn, use_ln):
         super().__init__()
         self._num_states = num_states
         self._num_actions = num_actions
         self._num_features = num_features
         self._use_wn = use_wn
+        self._use_ln = use_ln
         self._initial_state = tc.zeros(2 * self._num_features)
         self._memory = LSTM(
             input_dim=self._num_states+self._num_actions+2,
             hidden_dim=self._num_features,
-            use_wn=self._use_wn)
+            use_wn=self._use_wn,
+            use_ln=self._use_ln)
 
         self._policy_head = PolicyHead(
             num_actions=self._num_actions,
-            num_features=self._num_features)
+            num_features=self._num_features,
+            use_wn=self._use_wn)
 
     def initial_state(self, batch_size: int) -> tc.FloatTensor:
         """
@@ -192,14 +198,15 @@ class ValueNetworkGRU(StatefulValueNet):
     Value network from Duan et al., 2016 for MDPs.
     """
     def __init__(
-            self, num_states, num_actions, num_features, use_wn, forget_bias,
-            reset_after=True
+            self, num_states, num_actions, num_features, use_wn, use_ln,
+            forget_bias, reset_after=True
     ):
         super().__init__()
         self._num_states = num_states
         self._num_actions = num_actions
         self._num_features = num_features
         self._use_wn = use_wn
+        self._use_ln = use_ln
         self._forget_bias = forget_bias
         self._reset_after = reset_after
         self._initial_state = tc.zeros(self._num_features)
@@ -207,11 +214,13 @@ class ValueNetworkGRU(StatefulValueNet):
             input_dim=self._num_states+self._num_actions+2,
             hidden_dim=self._num_features,
             use_wn=self._use_wn,
+            use_ln=self._use_ln,
             forget_bias=self._forget_bias,
             reset_after=self._reset_after)
 
         self._value_head = ValueHead(
-            num_features=self._num_features)
+            num_features=self._num_features,
+            use_wn=self._use_wn)
 
     def initial_state(self, batch_size: int) -> tc.FloatTensor:
         """
@@ -267,20 +276,23 @@ class ValueNetworkLSTM(StatefulValueNet):
     """
     LSTM value network for meta-reinforcement learning in MDPs.
     """
-    def __init__(self, num_states, num_actions, num_features, use_wn):
+    def __init__(self, num_states, num_actions, num_features, use_wn, use_ln):
         super().__init__()
         self._num_states = num_states
         self._num_actions = num_actions
         self._num_features = num_features
         self._use_wn = use_wn
+        self._use_ln = use_ln
         self._initial_state = tc.zeros(2 * self._num_features)
         self._memory = LSTM(
             input_dim=self._num_states+self._num_actions+2,
             hidden_dim=self._num_features,
-            use_wn=self._use_wn)
+            use_wn=self._use_wn,
+            use_ln=self._use_ln)
 
         self._value_head = ValueHead(
-            num_features=self._num_features)
+            num_features=self._num_features,
+            use_wn=self._use_wn)
 
     def initial_state(self, batch_size: int) -> tc.FloatTensor:
         """
