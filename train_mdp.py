@@ -1,5 +1,5 @@
 """
-Implements training loop for the bandit agent from Duan et al., 2016
+Implements training loop for the mdp agent from Duan et al., 2016
 - 'RL^2: Fast Reinforcement Learning via Slow Reinforcement Learning'
 """
 
