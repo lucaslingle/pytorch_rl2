@@ -84,7 +84,7 @@ class DuanGRU(tc.nn.Module):
     """
     def __init__(
             self, input_dim, hidden_dim, use_wn=False, use_ln=True,
-            forget_bias=1.0, reset_after=False
+            forget_bias=1.0, reset_after=True
     ):
         super().__init__()
         self._input_dim = input_dim

@@ -55,12 +55,14 @@ def main():
         num_actions=args.num_actions,
         num_features=args.num_features,
         use_wn=bool(args.use_wn),
+        use_ln=True,
         forget_bias=args.forget_bias,
         reset_after=True)
     value_net = ValueNetworkGRU(
         num_actions=args.num_actions,
         num_features=args.num_features,
         use_wn=bool(args.use_wn),
+        use_ln=True,
         forget_bias=args.forget_bias,
         reset_after=True)
 
