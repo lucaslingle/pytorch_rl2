@@ -12,9 +12,10 @@ from rl2.agents.mdp_agent import PolicyNetworkGRU, ValueNetworkGRU
 from rl2.envs.mdp_env import MDPEnv
 from rl2.algos.ppo import training_loop
 
-from rl2.utils.comm_util import get_comm, sync_state
 from rl2.utils.checkpoint_util import maybe_load_checkpoint, save_checkpoint
+from rl2.utils.comm_util import get_comm, sync_state
 from rl2.utils.constants import ROOT_RANK
+from rl2.utils.optim_util import get_weight_decay_param_groups
 
 
 def create_argparser():
@@ -41,6 +42,7 @@ def create_argparser():
     parser.add_argument("--standardize_advs", type=int, choices=[0,1], default=0)
     parser.add_argument("--adam_lr", type=float, default=2e-4)
     parser.add_argument("--adam_eps", type=float, default=1e-5)
+    parser.add_argument("--adam_wd", type=float, default=0.01)
     parser.add_argument("--experiment_seed", type=int, default=0) # not yet used
     return parser
 
@@ -73,12 +75,12 @@ def main():
         forget_bias=args.forget_bias,
         reset_after=True)
 
-    policy_optimizer = tc.optim.Adam(
-        params=policy_net.parameters(),
+    policy_optimizer = tc.optim.AdamW(
+        get_weight_decay_param_groups(policy_net, args.adam_wd),
         lr=args.adam_lr,
         eps=args.adam_eps)
-    value_optimizer = tc.optim.Adam(
-        params=value_net.parameters(),
+    value_optimizer = tc.optim.AdamW(
+        get_weight_decay_param_groups(value_net, args.adam_wd),
         lr=args.adam_lr,
         eps=args.adam_eps)
 
