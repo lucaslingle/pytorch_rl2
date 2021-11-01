@@ -46,7 +46,7 @@ class MDPPreprocessing(tc.nn.Module):
             curr_obs: tc.FloatTensor of shape [B, ..., C, H, W]
             prev_action: tc.LongTensor of shape [B, ...]
             prev_reward: tc.FloatTensor of shape [B, ...]
-            prev_done: tc.LongTensor of shape [B, ...]
+            prev_done: tc.FloatTensor of shape [B, ...]
 
         Returns:
             tc.FloatTensor of shape [B, ..., F+A+2]
