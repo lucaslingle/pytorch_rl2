@@ -1,5 +1,5 @@
 """
-Implements preprocessing for tabular MABs and MDPs.
+Implements preprocessing for vision-based MDPs/POMDPs.
 """
 
 import abc
@@ -18,10 +18,10 @@ class AbstractVisionNet(abc.ABC, tc.nn.Module):
         Embeds visual observations into feature vectors.
 
         Args:
-            curr_obs: tc.FloatTensor of shape [B, ..., C, H, W]
+            curr_obs: tc.FloatTensor of shape [B, C, H, W]
 
         Returns:
-            a tc.FloatTensor of shape [B, ..., F]
+            a tc.FloatTensor of shape [B, F]
         """
         pass
 
@@ -52,7 +52,11 @@ class MDPPreprocessing(tc.nn.Module):
             tc.FloatTensor of shape [B, ..., F+A+2]
         """
 
+        curr_obs_shape = list(curr_obs.shape)
+        curr_obs = curr_obs.view(-1, *curr_obs_shape[-3:])
         emb_o = self._vision_net(curr_obs)
+        emb_o = emb_o.view(*curr_obs_shape[:-3], emb_o.shape[-1])
+
         emb_a = one_hot(prev_action, depth=self._num_actions)
         prev_reward = prev_reward.unsqueeze(-1)
         prev_done = prev_done.unsqueeze(-1)

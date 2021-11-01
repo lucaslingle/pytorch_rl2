@@ -2,7 +2,7 @@
 Implements StatefulPolicyNet module
 """
 
-from typing import Union, Tuple
+from typing import Union, Tuple, Optional
 
 import torch as tc
 
@@ -20,18 +20,22 @@ class StatefulPolicyNet(tc.nn.Module):
         prev_action: tc.LongTensor,
         prev_reward: tc.FloatTensor,
         prev_done: tc.FloatTensor,
-        prev_state: tc.FloatTensor
+        prev_state: Optional[tc.FloatTensor]
     ) -> Tuple[tc.distributions.Categorical, tc.FloatTensor]:
         """
-        Runs recurrent state update and returns policy dist and new state.
+        Runs agent state update and returns policy dist(s) and new state.
 
         Args:
-            curr_obs: current timestep observation as tc.LongTensor
-                or tc.FloatTensor with shape [B, ..., ?].
-            prev_action: prev timestep actions as tc.LongTensor w/ shape [B, ...]
-            prev_reward: prev timestep rews as tc.FloatTensor w/ shape [B, ...]
-            prev_done: prev timestep done flags as tc.FloatTensor w/ shape [B, ...]
-            prev_state: prev agent state.
+            curr_obs: current observation(s) tensor with shape [B, ..., ?].
+            prev_action: previous action(s) tensor with shape [B, ...]
+            prev_reward: previous rewards(s) tensor with shape [B, ...]
+            prev_done: previous done flag(s) tensor with shape [B, ...]
+            prev_state: agent's previous state.
+
+        Notes:
+            '...' must be either one dimensional or must not exist;
+            for recurrent policies, it should not exist;
+            for attentive policies, it should be the length of presents.
 
         Returns:
             Tuple containing policy distribution(s) with batch shape [B, ...]
@@ -44,6 +48,6 @@ class StatefulPolicyNet(tc.nn.Module):
             input_vec=vec,
             prev_state=prev_state)
 
-        dists = self._policy_head(features)
+        dist = self._policy_head(features)
 
-        return dists, new_state
+        return dist, new_state
