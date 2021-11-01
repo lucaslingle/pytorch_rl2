@@ -26,7 +26,7 @@ class TCBlock(tc.nn.Module):
         present_activations = input_vec.unsqueeze(1)  # [B, 1, T, F]
         past_activations = prev_state  # [B, L, T, F]
         num_layers = self.num_layers()
-        for l in num_layers:
+        for l in range(num_layers):
             combined_layer_input = tc.cat(
                 (past_activations[:, 0:(l-1)], present_activations[:, 0:(l-1)]),
                 dim=2)
