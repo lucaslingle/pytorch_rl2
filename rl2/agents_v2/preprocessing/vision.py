@@ -34,7 +34,7 @@ class MDPPreprocessing(tc.nn.Module):
 
     def forward(
         self,
-        curr_obs: tc.LongTensor,
+        curr_obs: tc.FloatTensor,
         prev_action: tc.LongTensor,
         prev_reward: tc.FloatTensor,
         prev_done: tc.FloatTensor
