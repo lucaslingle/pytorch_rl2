@@ -28,7 +28,7 @@ class TCBlock(tc.nn.Module):
         num_layers = self.num_layers()
         for l in num_layers:
             combined_layer_input = tc.cat(
-                (past_activations[0:(l-1)], present_activations[0:(l-1)]),
+                (past_activations[:, 0:(l-1)], present_activations[:, 0:(l-1)]),
                 dim=2)
             output = self._dense_blocks[l](combined_layer_input)
             present_activations = tc.cat(
