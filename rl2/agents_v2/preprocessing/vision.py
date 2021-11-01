@@ -6,7 +6,7 @@ import abc
 
 import torch as tc
 
-from rl2.agents_v2.preprocessing.common import one_hot
+from rl2.agents_v2.preprocessing.common import one_hot, Preprocessing
 
 
 class VisionNet(abc.ABC, tc.nn.Module):
@@ -27,7 +27,7 @@ class VisionNet(abc.ABC, tc.nn.Module):
         pass
 
 
-class MDPPreprocessing(tc.nn.Module):
+class MDPPreprocessing(Preprocessing):
     def __init__(self, num_actions: int, vision_net: VisionNet):
         super().__init__()
         self._num_actions = num_actions

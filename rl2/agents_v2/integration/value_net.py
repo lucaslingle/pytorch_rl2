@@ -14,6 +14,9 @@ class StatefulValueNet(tc.nn.Module):
         self._architecture = architecture
         self._value_head = value_head
 
+    def initial_state(self, batch_size: int) -> tc.FloatTensor:
+        return self._architecture.initial_state(batch_size=batch_size)
+
     def forward(
         self,
         curr_obs: Union[tc.LongTensor, tc.FloatTensor],

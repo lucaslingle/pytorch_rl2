@@ -4,16 +4,17 @@ Implements preprocessing for tabular MABs and MDPs.
 
 import torch as tc
 
-from rl2.agents_v2.preprocessing.common import one_hot
+from rl2.agents_v2.preprocessing.common import one_hot, Preprocessing
 
 
-class MABPreprocessing(tc.nn.Module):
+class MABPreprocessing(Preprocessing):
     def __init__(self, num_actions: int):
         super().__init__()
         self._num_actions = num_actions
 
     def forward(
         self,
+        curr_obs: tc.LongTensor,
         prev_action: tc.LongTensor,
         prev_reward: tc.FloatTensor,
         prev_done: tc.FloatTensor
@@ -22,6 +23,7 @@ class MABPreprocessing(tc.nn.Module):
         Creates an input vector for a meta-learning agent.
 
         Args:
+            curr_obs: tc.LongTensor of shape [B, ...]; will be ignored.
             prev_action: tc.LongTensor of shape [B, ...]
             prev_reward: tc.FloatTensor of shape [B, ...]
             prev_done: tc.FloatTensor of shape [B, ...]
@@ -37,7 +39,7 @@ class MABPreprocessing(tc.nn.Module):
         return vec
 
 
-class MDPPreprocessing(tc.nn.Module):
+class MDPPreprocessing(Preprocessing):
     def __init__(self, num_actions: int, num_states: int):
         super().__init__()
         self._num_actions = num_actions

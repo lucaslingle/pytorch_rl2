@@ -50,6 +50,18 @@ class GRU(tc.nn.Module):
             self._x2hhat_ln = LayerNorm(units=self._hidden_dim)
             self._h2hhat_ln = LayerNorm(units=self._hidden_dim)
 
+        self._initial_state = tc.zeros(self._hidden_dim)
+
+    def initial_state(self, batch_size: int) -> tc.FloatTensor:
+        """
+        Return initial state of zeros.
+        Args:
+            batch_size: batch size to tile the initial state by.
+        Returns:
+            initial_state FloatTensor.
+        """
+        return self._initial_state.unsqueeze(0).repeat(batch_size, 1)
+
     def forward(
         self,
         input_vec: tc.LongTensor,
@@ -60,7 +72,6 @@ class GRU(tc.nn.Module):
         Args:
             input_vec: current timestep input vector as tc.FloatTensor
             prev_state: prev hidden state w/ shape [B, H].
-
         Returns:
             features, new_state.
         """

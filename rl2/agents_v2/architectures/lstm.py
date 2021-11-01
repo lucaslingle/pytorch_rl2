@@ -36,6 +36,18 @@ class LSTM(tc.nn.Module):
             self._h2fioj_ln = LayerNorm(units=(4 * self._hidden_dim))
             self._c_out_ln = LayerNorm(units=self._hidden_dim)
 
+        self._initial_state = tc.zeros(2 * self._hidden_dim)
+
+    def initial_state(self, batch_size: int) -> tc.FloatTensor:
+        """
+        Return initial state of zeros.
+        Args:
+            batch_size: batch size to tile the initial state by.
+        Returns:
+            initial_state FloatTensor.
+        """
+        return self._initial_state.unsqueeze(0).repeat(batch_size, 1)
+
     def forward(
         self,
         input_vec: tc.LongTensor,
@@ -46,7 +58,6 @@ class LSTM(tc.nn.Module):
         Args:
             input_vec: current timestep input vector as tc.FloatTensor
             prev_state: prev lstm state w/ shape [B, 2*H].
-
         Returns:
             features, new_state.
         """
