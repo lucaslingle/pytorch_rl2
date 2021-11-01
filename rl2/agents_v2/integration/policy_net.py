@@ -23,14 +23,15 @@ class StatefulPolicyNet(tc.nn.Module):
         prev_state: Optional[tc.FloatTensor]
     ) -> Tuple[tc.distributions.Categorical, tc.FloatTensor]:
         """
-        Runs agent state update and returns policy dist(s) and new state.
+        Runs preprocessing and the architecture's state update;
+        returns policy distribution(s) and new state.
 
         Args:
             curr_obs: current observation(s) tensor with shape [B, ..., ?].
             prev_action: previous action(s) tensor with shape [B, ...]
             prev_reward: previous rewards(s) tensor with shape [B, ...]
             prev_done: previous done flag(s) tensor with shape [B, ...]
-            prev_state: agent's previous state.
+            prev_state: the architecture's previous state.
 
         Notes:
             '...' must be either one dimensional or must not exist;
@@ -39,7 +40,7 @@ class StatefulPolicyNet(tc.nn.Module):
 
         Returns:
             Tuple containing policy distribution(s) with batch shape [B, ...]
-               and agent state tc.FloatTensor with batch shape [B, ...+].
+               and the architecture's new state.
         """
         vec = self._preprocessing(
             curr_obs, prev_action, prev_reward, prev_done)
