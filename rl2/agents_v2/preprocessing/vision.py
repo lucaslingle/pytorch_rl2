@@ -9,10 +9,11 @@ import torch as tc
 from rl2.agents_v2.preprocessing.common import one_hot
 
 
-class AbstractVisionNet(abc.ABC, tc.nn.Module):
+class VisionNet(abc.ABC, tc.nn.Module):
     """
-    Abstract class implementing a vision network
+    Vision network abstract class.
     """
+    @abc.abstractmethod
     def forward(self, curr_obs: tc.FloatTensor) -> tc.FloatTensor:
         """
         Embeds visual observations into feature vectors.
@@ -27,7 +28,7 @@ class AbstractVisionNet(abc.ABC, tc.nn.Module):
 
 
 class MDPPreprocessing(tc.nn.Module):
-    def __init__(self, num_actions: int, vision_net: AbstractVisionNet):
+    def __init__(self, num_actions: int, vision_net: VisionNet):
         super().__init__()
         self._num_actions = num_actions
         self._vision_net = vision_net
