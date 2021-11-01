@@ -1,5 +1,5 @@
 """
-Implements StatefulPolicyNet module
+Implements StatefulPolicyNet class.
 """
 
 from typing import Union, Tuple, Optional

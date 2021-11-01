@@ -1,5 +1,5 @@
 """
-Implements StatefulValueNet module
+Implements StatefulValueNet class.
 """
 
 from typing import Union, Tuple, Optional
@@ -21,7 +21,7 @@ class StatefulValueNet(tc.nn.Module):
         prev_reward: tc.FloatTensor,
         prev_done: tc.FloatTensor,
         prev_state: Optional[tc.FloatTensor]
-    ) -> Tuple[tc.distributions.Categorical, tc.FloatTensor]:
+    ) -> Tuple[tc.FloatTensor, tc.FloatTensor]:
         """
         Runs agent state update and returns value estimate(s) and new state.
 
