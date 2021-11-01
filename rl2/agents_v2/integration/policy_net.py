@@ -34,8 +34,8 @@ class StatefulPolicyNet(tc.nn.Module):
 
         Notes:
             '...' must be either one dimensional or must not exist;
-            for recurrent policies, it should not exist;
-            for attentive policies, it should be the length of presents.
+            for recurrent architectures, it should not exist;
+            for attentive architectures, it should be the length of presents.
 
         Returns:
             Tuple containing policy distribution(s) with batch shape [B, ...]
