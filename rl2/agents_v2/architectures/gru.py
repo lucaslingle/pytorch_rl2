@@ -64,7 +64,7 @@ class GRU(tc.nn.Module):
 
     def forward(
         self,
-        input_vec: tc.LongTensor,
+        input_vec: tc.FloatTensor,
         prev_state: tc.FloatTensor
     ) -> Tuple[tc.FloatTensor, tc.FloatTensor]:
         """

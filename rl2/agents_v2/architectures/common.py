@@ -39,11 +39,12 @@ def masked_self_attention(q, k, v):
 
 
 class MultiheadSelfAttention(tc.nn.Module):
-    def __init__(self, num_features, num_heads, num_head_features):
+    def __init__(self, input_dim, num_heads, num_head_features, proj_dim):
         super().__init__()
-        self._num_features = num_features
+        self._input_dim = input_dim
         self._num_heads = num_heads
         self._num_head_features = num_head_features
+        self._proj_dim = proj_dim
 
         # TODO(lucaslingle):
         # add linear modules and forward method that supports optional memory tensor

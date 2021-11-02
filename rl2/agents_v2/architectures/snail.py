@@ -2,11 +2,12 @@
 Implements SNAIL architecture (Mishra et al., 2017) for RL^2.
 """
 
-from typing import Optional
+from typing import Optional, Tuple
+from collections import namedtuple
 
 import torch as tc
 
-from rl2.agents_v2.architectures.common import LayerNorm
+from rl2.agents_v2.architectures.common import LayerNorm, MultiheadSelfAttention
 
 
 class CausalConv(tc.nn.Module):
@@ -135,16 +136,12 @@ class TCBlock(tc.nn.Module):
             self,
             input_dim,
             feature_dim,
-            kernel_size,
-            dilation_rate,
             context_size,
             use_ln=True
     ):
         super().__init__()
         self._input_dim = input_dim
         self._feature_dim = feature_dim
-        self._kernel_size = kernel_size
-        self._dilation_rate = dilation_rate
         self._context_size = context_size
         self._use_ln = use_ln
 
@@ -159,15 +156,16 @@ class TCBlock(tc.nn.Module):
         ])
 
     @property
+    def input_dim(self):
+        return self._input_dim
+
+    @property
     def num_layers(self):
         raise NotImplementedError
 
-    def forward(self, input_vec, prev_state):
-        if len(list(input_vec.shape)) == 2:
-            input_vec = input_vec.unsqueeze(1)
-
+    def forward(self, input_vecs, prev_state):
         past_activations = prev_state  # [B, T1, I+(L-1)*F]
-        present_activations = input_vec  # [B, T2, I]
+        present_activations = input_vecs  # [B, T2, I]
 
         for l in range(0, self.num_layers):  # 0, ..., num_layers-1
             if past_activations is None:
@@ -187,3 +185,108 @@ class TCBlock(tc.nn.Module):
                 dim=-1)  # [B, T2, I+(l+1)*F]
 
         return present_activations  # [B, T2, I+L*F]
+
+
+SNAILState = namedtuple(
+    'SNAILState',
+    field_names=[
+        'input_vecs',
+        'tc1_activations',
+        'tc2_activations',
+        'attn_kv'
+    ])
+
+
+class SNAIL(tc.nn.Module):
+    def __init__(self, input_dim, feature_dim, context_size):
+        super().__init__()
+        self._input_dim = input_dim
+        self._feature_dim = feature_dim
+        self._context_size = context_size
+
+        self._tcb1_input_dim = self._input_dim
+        self._tcb1 = TCBlock(
+            input_dim=self._tcb1_input_dim,
+            feature_dim=self._feature_dim,
+            context_size=self._context_size,
+            use_ln=True)
+
+        self._tcb2_input_dim = self._input_dim + \
+                               self._tcb1.num_layers * self._feature_dim
+        self._tcb2 = TCBlock(
+            input_dim=self._tcb2_input_dim,
+            feature_dim=self._feature_dim,
+            context_size=self._context_size,
+            use_ln=True)
+
+        self._attn_input_dim = self._input_dim + \
+                               self._tcb1.num_layers * self._feature_dim + \
+                               self._tcb2.num_layers * self._feature_dim
+        self._attn = MultiheadSelfAttention(
+            input_dim=self._attn_input_dim,
+            num_heads=1,
+            num_head_features=self._feature_dim,
+            proj_dim=self._feature_dim)
+
+    def forward(
+        self,
+        input_vec: tc.FloatTensor,
+        prev_state: SNAILState
+    ) -> Tuple[tc.FloatTensor, SNAILState]:
+        """
+        Run state update, compute features.
+
+        Args:
+            input_vec: input vec tensor with shape [B, ..., ?]
+            prev_state: previous architecture state
+
+        Notes:
+            '...' must be either one dimensional or must not exist
+
+        Returns:
+            tc.FloatTensor features with shape [B, ..., F],
+            SNAILState new_state.
+        """
+
+        if len(list(input_vec.shape)) == 2:
+            input_vec = input_vec.unsqueeze(1)
+
+        tcb1_out = self._tcb1(
+            input_vec=input_vec,
+            prev_state=tc.cat(
+                (prev_state.input_vecs, prev_state.tc1_activations),
+                dim=-1)
+        )
+
+        tcb2_out = self._tcb2(
+            input_vec=tcb1_out,
+            prev_state=tc.cat(
+                (prev_state.input_vecs,
+                 prev_state.tc1_activations,
+                 prev_state.tc2_activations),
+                dim=-1)
+        )
+
+        attn_out, new_attn_kv = self._attn(
+            presents=tcb2_out,
+            pasts=prev_state.attn_kv
+        )
+        attn_out = tc.cat((tcb2_out, attn_out), dim=-1)
+
+        features = attn_out
+        new_state = SNAILState(
+            input_vecs=tc.cat(
+                (prev_state.input_vecs, input_vec),
+                dim=1),
+            tc1_activations=tc.cat(
+                (prev_state.tc1_activations,
+                 tcb1_out[:, :, self._tcb1.input_dim:]),
+                dim=1),
+            tc2_activations=tc.cat(
+                (prev_state.tc1_activations,
+                 tcb2_out[:, :, self._tcb2.input_dim:]),
+                dim=1),
+            attn_kv=new_attn_kv
+        )
+
+        return features, new_state

@@ -2,12 +2,15 @@
 Implements StatefulValueNet class.
 """
 
-from typing import Union, Tuple, Optional
+from typing import Union, Tuple, Optional, TypeVar, Generic
 
 import torch as tc
 
 
-class StatefulValueNet(tc.nn.Module):
+ArchitectureState = TypeVar('ArchitectureState')
+
+
+class StatefulValueNet(tc.nn.Module, Generic[ArchitectureState]):
     def __init__(self, preprocessing, architecture, value_head):
         super().__init__()
         self._preprocessing = preprocessing
@@ -23,8 +26,8 @@ class StatefulValueNet(tc.nn.Module):
         prev_action: tc.LongTensor,
         prev_reward: tc.FloatTensor,
         prev_done: tc.FloatTensor,
-        prev_state: Optional[tc.FloatTensor]
-    ) -> Tuple[tc.FloatTensor, tc.FloatTensor]:
+        prev_state: Optional[ArchitectureState]
+    ) -> Tuple[tc.FloatTensor, ArchitectureState]:
         """
         Runs preprocessing and the architecture's state update;
         returns value estimate(s) and new state.

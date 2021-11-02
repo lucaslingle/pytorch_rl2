@@ -2,12 +2,15 @@
 Implements StatefulPolicyNet class.
 """
 
-from typing import Union, Tuple, Optional
+from typing import Union, Tuple, Optional, TypeVar, Generic
 
 import torch as tc
 
 
-class StatefulPolicyNet(tc.nn.Module):
+ArchitectureState = TypeVar('ArchitectureState')
+
+
+class StatefulPolicyNet(tc.nn.Module, Generic[ArchitectureState]):
     def __init__(self, preprocessing, architecture, policy_head):
         super().__init__()
         self._preprocessing = preprocessing
@@ -23,8 +26,8 @@ class StatefulPolicyNet(tc.nn.Module):
         prev_action: tc.LongTensor,
         prev_reward: tc.FloatTensor,
         prev_done: tc.FloatTensor,
-        prev_state: Optional[tc.FloatTensor]
-    ) -> Tuple[tc.distributions.Categorical, tc.FloatTensor]:
+        prev_state: Optional[ArchitectureState]
+    ) -> Tuple[tc.distributions.Categorical, ArchitectureState]:
         """
         Runs preprocessing and the architecture's state update;
         returns policy distribution(s) and new state.
