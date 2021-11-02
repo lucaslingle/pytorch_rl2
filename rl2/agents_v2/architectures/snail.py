@@ -211,7 +211,7 @@ class SNAIL(tc.nn.Module):
     def forward(
         self,
         inputs: tc.FloatTensor,
-        prev_state: tc.FloatTensor
+        prev_state: Optional[tc.FloatTensor]
     ) -> Tuple[tc.FloatTensor, tc.FloatTensor]:
         """
         Run state update, compute features.
