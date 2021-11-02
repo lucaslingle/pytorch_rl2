@@ -3,9 +3,9 @@ Implements SNAIL architecture (Mishra et al., 2017) for RL^2.
 """
 
 from typing import Optional, Tuple
-from collections import namedtuple
 
 import torch as tc
+import numpy as np
 
 from rl2.agents_v2.architectures.common import LayerNorm, MultiheadSelfAttention
 
@@ -153,7 +153,8 @@ class TCBlock(tc.nn.Module):
 
     @property
     def num_layers(self):
-        raise NotImplementedError
+        log2_context_size = np.log(self._context_size) / np.log(2)
+        return int(np.ceil(log2_context_size))
 
     def forward(self, inputs, past_inputs=None):
         """
