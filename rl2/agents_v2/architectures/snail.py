@@ -15,13 +15,15 @@ class CausalConv(tc.nn.Module):
             input_dim,
             feature_dim,
             kernel_size,
-            dilation_rate
+            dilation_rate,
+            use_bias=True
     ):
         super().__init__()
         self._input_dim = input_dim
         self._feature_dim = feature_dim
         self._kernel_size = kernel_size
         self._dilation_rate = dilation_rate
+        self._use_bias = use_bias
 
         self._conv = tc.nn.Conv1d(
             in_channels=self._input_dim,
@@ -30,7 +32,7 @@ class CausalConv(tc.nn.Module):
             stride=(1,),
             padding=(0,),
             dilation=self._dilation_rate,
-            bias=(not self._use_ln))
+            bias=self._use_bias)
 
     @property
     def effective_kernel_size(self):
@@ -108,7 +110,8 @@ class DenseBlock(tc.nn.Module):
             input_dim=self._input_dim,
             feature_dim=2*self._feature_dim,
             kernel_size=self._kernel_size,
-            dilation_rate=self._dilation_rate)
+            dilation_rate=self._dilation_rate,
+            use_bias=(not self._use_ln))
 
         if self._use_ln:
             self._conv_ln = LayerNorm(units=self._feature_dim)
