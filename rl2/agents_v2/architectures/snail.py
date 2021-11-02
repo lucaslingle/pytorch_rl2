@@ -57,7 +57,7 @@ class CausalConv(tc.nn.Module):
             and possibly zero padding.
         """
         batch_size = inputs.shape[0]
-        effective_kernel_size = self.effective_kernel_size()
+        effective_kernel_size = self.effective_kernel_size
 
         if past_inputs is not None:
             t1 = list(past_inputs.shape)[1]
@@ -146,10 +146,6 @@ class TCBlock(tc.nn.Module):
                 use_ln=self._use_ln)
             for l in range(0, self.num_layers)
         ])
-
-    @property
-    def input_dim(self):
-        return self._input_dim
 
     @property
     def num_layers(self):
