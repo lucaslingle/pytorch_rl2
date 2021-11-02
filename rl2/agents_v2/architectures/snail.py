@@ -151,30 +151,30 @@ class TCBlock(tc.nn.Module):
         raise NotImplementedError
 
     def forward(self, input_vec, prev_state):
-        present_activations = input_vec.unsqueeze(1)  # [B, 1, T, F]
-        past_activations = prev_state  # [B, L, T, F]
+        past_activations = prev_state  # [B, L, T1, F]
+        present_activations = input_vec.unsqueeze(1)  # [B, 1, T2, F]
         num_layers = self.num_layers()
 
         for l in range(1, num_layers+1):  # 1, ..., num_layers
-            present_inputs = tc.cat(
-                tc.unbind(present_activations[:, 0:l]),
-                dim=-1
-            )
-
             if past_activations is None:
                 past_inputs = None
             else:
                 past_inputs = tc.cat(
                     tc.unbind(past_activations[:, 0:l]),
-                    dim=-1)
+                    dim=-1)  # [B, T1, L*F]
+
+            present_inputs = tc.cat(
+                tc.unbind(present_activations[:, 0:l]),
+                dim=-1
+            )  # [B, T2, l*F]
 
             output = self._dense_blocks[l](
                 present_inputs=present_inputs,
-                past_inputs=past_inputs)
+                past_inputs=past_inputs)  # [B, T2, F2]
 
             present_activations = tc.cat(
-                (present_activations, output),
-                dim=1)
+                (present_activations, output.unsqueeze(1)),
+                dim=1)  # [B, l+1, T2, F]
 
-        return present_activations
+        return present_activations  # [B, L+1, T2, F]
 
