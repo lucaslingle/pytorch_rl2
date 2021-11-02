@@ -154,7 +154,6 @@ class TCBlock(tc.nn.Module):
 
     def forward(self, inputs, past_inputs=None):
         """
-
         Args:
             inputs: inputs tensor of shape [B, T2, I]
             past_inputs: optional past inputs tensor of shape [B, T1, I+L*F]
