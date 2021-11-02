@@ -15,15 +15,13 @@ class CausalConv(tc.nn.Module):
             input_dim,
             feature_dim,
             kernel_size,
-            dilation_rate,
-            use_ln=True
+            dilation_rate
     ):
         super().__init__()
         self._input_dim = input_dim
         self._feature_dim = feature_dim
         self._kernel_size = kernel_size
         self._dilation_rate = dilation_rate
-        self._use_ln = use_ln
 
         self._conv = tc.nn.Conv1d(
             in_channels=self._input_dim,
@@ -33,9 +31,6 @@ class CausalConv(tc.nn.Module):
             padding=(0,),
             dilation=self._dilation_rate,
             bias=(not self._use_ln))
-
-        if self._use_ln:
-            self._conv_ln = LayerNorm(units=self._feature_dim)
 
     @property
     def effective_kernel_size(self):
@@ -90,9 +85,6 @@ class CausalConv(tc.nn.Module):
             )
 
         conv = self._conv(inputs)
-        if self._use_ln:
-            conv = self._conv_ln(conv)
-
         return conv
 
 
@@ -116,13 +108,18 @@ class DenseBlock(tc.nn.Module):
             input_dim=self._input_dim,
             feature_dim=2*self._feature_dim,
             kernel_size=self._kernel_size,
-            dilation_rate=self._dilation_rate,
-            use_ln=self._use_ln)
+            dilation_rate=self._dilation_rate)
+
+        if self._use_ln:
+            self._conv_ln = LayerNorm(units=self._feature_dim)
 
     def forward(self, present_inputs, past_inputs=None):
         conv = self._conv(
             present_inputs=present_inputs,
             past_inputs=past_inputs)
+
+        if self._use_ln:
+            conv = self._conv_ln(conv)
 
         xg, xf = tc.chunk(conv, 2, dim=-1)
         xg, xf = tc.nn.Sigmoid()(xg), tc.nn.Tanh()(xf)
