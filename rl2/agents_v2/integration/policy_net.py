@@ -48,12 +48,11 @@ class StatefulPolicyNet(tc.nn.Module, Generic[ArchitectureState]):
             Tuple containing policy distribution(s) with batch shape [B, ...]
                and the architecture's new state.
         """
-        vec = self._preprocessing(
+        inputs = self._preprocessing(
             curr_obs, prev_action, prev_reward, prev_done)
 
         features, new_state = self._architecture(
-            input_vec=vec,
-            prev_state=prev_state)
+            inputs=inputs, prev_state=prev_state)
 
         dist = self._policy_head(features)
 

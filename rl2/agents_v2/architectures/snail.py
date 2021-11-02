@@ -43,12 +43,12 @@ class CausalConv(tc.nn.Module):
 
     def forward(
             self,
-            present_inputs: tc.FloatTensor,
+            inputs: tc.FloatTensor,
             past_inputs: Optional[tc.FloatTensor] = None
     ) -> tc.FloatTensor:
         """
         Args:
-            present_inputs: present input tensor of shape [B, T2, I]
+            inputs: present input tensor of shape [B, T2, I]
             past_inputs: optional past input tensor of shape [B, T1, I]
 
         Returns:
@@ -56,7 +56,7 @@ class CausalConv(tc.nn.Module):
             The present inputs are padded with past inputs (if any),
             and possibly zero padding.
         """
-        batch_size = present_inputs.shape[0]
+        batch_size = inputs.shape[0]
         effective_kernel_size = self.effective_kernel_size()
 
         if past_inputs is not None:
@@ -65,27 +65,19 @@ class CausalConv(tc.nn.Module):
                 zpl = (effective_kernel_size - 1) - t1
                 zps = (batch_size, zpl, self._input_dim)
                 zp = tc.zeros(size=zps, dtype=tc.float32)
-                inputs = tc.cat(
-                    (zp, past_inputs, present_inputs),
-                    dim=1
-                )
+                inputs = tc.cat((zp, past_inputs, inputs), dim=1)
             elif t1 > effective_kernel_size - 1:
                 inputs = tc.cat(
-                    (past_inputs[:, -(effective_kernel_size - 1):], present_inputs),
+                    (past_inputs[:, -(effective_kernel_size - 1):], inputs),
                     dim=1
                 )
             else:
-                inputs = tc.cat(
-                    (past_inputs, present_inputs),
-                    dim=1)
+                inputs = tc.cat((past_inputs, inputs), dim=1)
         else:
             zpl = (effective_kernel_size - 1)
             zps = (batch_size, zpl, self._input_dim)
             zp = tc.zeros(size=zps, dtype=tc.float32)
-            inputs = tc.cat(
-                (zp, present_inputs),
-                dim=1
-            )
+            inputs = tc.cat((zp, inputs), dim=1)
 
         conv = self._conv(inputs)
         return conv
@@ -117,10 +109,8 @@ class DenseBlock(tc.nn.Module):
         if self._use_ln:
             self._conv_ln = LayerNorm(units=self._feature_dim)
 
-    def forward(self, present_inputs, past_inputs=None):
-        conv = self._conv(
-            present_inputs=present_inputs,
-            past_inputs=past_inputs)
+    def forward(self, inputs, past_inputs=None):
+        conv = self._conv(inputs=inputs, past_inputs=past_inputs)
 
         if self._use_ln:
             conv = self._conv_ln(conv)
@@ -128,7 +118,9 @@ class DenseBlock(tc.nn.Module):
         xg, xf = tc.chunk(conv, 2, dim=-1)
         xg, xf = tc.nn.Sigmoid()(xg), tc.nn.Tanh()(xf)
         activations = xg * xf
-        return activations
+
+        output = tc.cat((inputs, activations), dim=-1)
+        return output
 
 
 class TCBlock(tc.nn.Module):
@@ -163,38 +155,27 @@ class TCBlock(tc.nn.Module):
     def num_layers(self):
         raise NotImplementedError
 
-    def forward(self, input_vecs, prev_state):
-        past_activations = prev_state  # [B, T1, I+(L-1)*F]
-        present_activations = input_vecs  # [B, T2, I]
+    def forward(self, inputs, past_inputs=None):
+        """
 
+        Args:
+            inputs: inputs tensor of shape [B, T2, I]
+            past_inputs: optional past inputs tensor of shape [B, T1, I+L*F]
+
+        Returns:
+            tensor of shape [B, T2, I+L*F]
+        """
         for l in range(0, self.num_layers):  # 0, ..., num_layers-1
-            if past_activations is None:
-                past_inputs = None
+            if past_inputs is None:
+                past_inputs_for_layer = None
             else:
                 end_idx = self._input_dim + l * self._feature_dim
-                past_inputs = past_activations[:, :, 0:end_idx]  # [B, T1, I+l*F]
+                past_inputs_for_layer = past_inputs[:, :, 0:end_idx]
 
-            present_inputs = present_activations  # [B, T2, I+l*F]
+            inputs = self._dense_blocks[l](
+                inputs=inputs, past_inputs=past_inputs_for_layer)
 
-            output = self._dense_blocks[l](
-                present_inputs=present_inputs,
-                past_inputs=past_inputs)  # [B, T2, F]
-
-            present_activations = tc.cat(
-                (present_activations, output),
-                dim=-1)  # [B, T2, I+(l+1)*F]
-
-        return present_activations  # [B, T2, I+L*F]
-
-
-SNAILState = namedtuple(
-    'SNAILState',
-    field_names=[
-        'input_vecs',
-        'tc1_activations',
-        'tc2_activations',
-        'attn_kv'
-    ])
+        return inputs  # [B, T2, I+L*F]
 
 
 class SNAIL(tc.nn.Module):
@@ -204,89 +185,62 @@ class SNAIL(tc.nn.Module):
         self._feature_dim = feature_dim
         self._context_size = context_size
 
-        self._tcb1_input_dim = self._input_dim
-        self._tcb1 = TCBlock(
-            input_dim=self._tcb1_input_dim,
+        self._tc1_input_dim = self._input_dim
+        self._tc1 = TCBlock(
+            input_dim=self._tc1_input_dim,
             feature_dim=self._feature_dim,
             context_size=self._context_size,
             use_ln=True)
 
-        self._tcb2_input_dim = self._input_dim + \
-                               self._tcb1.num_layers * self._feature_dim
-        self._tcb2 = TCBlock(
-            input_dim=self._tcb2_input_dim,
+        self._tc2_input_dim = self._input_dim + \
+                              self._tc1.num_layers * self._feature_dim
+        self._tc2 = TCBlock(
+            input_dim=self._tc2_input_dim,
             feature_dim=self._feature_dim,
             context_size=self._context_size,
             use_ln=True)
 
         self._attn_input_dim = self._input_dim + \
-                               self._tcb1.num_layers * self._feature_dim + \
-                               self._tcb2.num_layers * self._feature_dim
+                               self._tc1.num_layers * self._feature_dim + \
+                               self._tc2.num_layers * self._feature_dim
         self._attn = MultiheadSelfAttention(
             input_dim=self._attn_input_dim,
             num_heads=1,
             num_head_features=self._feature_dim,
-            proj_dim=self._feature_dim)
+            connection_style='dense')
 
     def forward(
         self,
-        input_vec: tc.FloatTensor,
-        prev_state: SNAILState
-    ) -> Tuple[tc.FloatTensor, SNAILState]:
+        inputs: tc.FloatTensor,
+        prev_state: tc.FloatTensor
+    ) -> Tuple[tc.FloatTensor, tc.FloatTensor]:
         """
         Run state update, compute features.
 
         Args:
-            input_vec: input vec tensor with shape [B, ..., ?]
+            inputs: input vec tensor with shape [B, ..., ?]
             prev_state: previous architecture state
 
         Notes:
             '...' must be either one dimensional or must not exist
 
         Returns:
-            tc.FloatTensor features with shape [B, ..., F],
-            SNAILState new_state.
+            tuple containing features with shape [B, ..., F], and new_state.
         """
+        assert len(list(inputs.shape)) in [2, 3]
+        if len(list(inputs.shape)) == 2:
+            inputs = inputs.unsqueeze(1)
 
-        if len(list(input_vec.shape)) == 2:
-            input_vec = input_vec.unsqueeze(1)
+        tc1_out = self._tc1(
+            inputs=inputs, past_inputs=prev_state[0:self._tc1_input_dim])
 
-        tcb1_out = self._tcb1(
-            input_vec=input_vec,
-            prev_state=tc.cat(
-                (prev_state.input_vecs, prev_state.tc1_activations),
-                dim=-1)
-        )
-
-        tcb2_out = self._tcb2(
-            input_vec=tcb1_out,
-            prev_state=tc.cat(
-                (prev_state.input_vecs,
-                 prev_state.tc1_activations,
-                 prev_state.tc2_activations),
-                dim=-1)
-        )
+        tc2_out = self._tcb2(
+            inputs=tc1_out, past_inputs=prev_state[0:self._tc2_input_dim])
 
         attn_out, new_attn_kv = self._attn(
-            presents=tcb2_out,
-            pasts=prev_state.attn_kv
-        )
-        attn_out = tc.cat((tcb2_out, attn_out), dim=-1)
+            presents=tc2_out, past_kvs=prev_state[self._tc2_input_dim:])
 
         features = attn_out
-        new_state = SNAILState(
-            input_vecs=tc.cat(
-                (prev_state.input_vecs, input_vec),
-                dim=1),
-            tc1_activations=tc.cat(
-                (prev_state.tc1_activations,
-                 tcb1_out[:, :, self._tcb1.input_dim:]),
-                dim=1),
-            tc2_activations=tc.cat(
-                (prev_state.tc1_activations,
-                 tcb2_out[:, :, self._tcb2.input_dim:]),
-                dim=1),
-            attn_kv=new_attn_kv
-        )
+        new_state = tc.cat((tc2_out, new_attn_kv), dim=-1)
 
         return features, new_state

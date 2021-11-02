@@ -50,19 +50,20 @@ class LSTM(tc.nn.Module):
 
     def forward(
         self,
-        input_vec: tc.FloatTensor,
+        inputs: tc.FloatTensor,
         prev_state: tc.FloatTensor
     ) -> Tuple[tc.FloatTensor, tc.FloatTensor]:
         """
         Run recurrent state update.
         Args:
-            input_vec: current timestep input vector as tc.FloatTensor
+            inputs: current timestep input vector
             prev_state: prev lstm state w/ shape [B, 2*H].
         Returns:
             features, new_state.
         """
+        assert len(list(inputs.shape)) == 2
         hidden_vec, c_prev = tc.chunk(prev_state, 2, dim=-1)
-        fioj_from_x = self._x2fioj(input_vec)
+        fioj_from_x = self._x2fioj(inputs)
         fioj_from_h = self._h2fioj(hidden_vec)
         if self._use_ln:
             fioj_from_x = self._x2fioj_ln(fioj_from_x)

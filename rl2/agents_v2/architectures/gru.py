@@ -64,18 +64,19 @@ class GRU(tc.nn.Module):
 
     def forward(
         self,
-        input_vec: tc.FloatTensor,
+        inputs: tc.FloatTensor,
         prev_state: tc.FloatTensor
     ) -> Tuple[tc.FloatTensor, tc.FloatTensor]:
         """
         Run recurrent state update.
         Args:
-            input_vec: current timestep input vector as tc.FloatTensor
+            inputs: current timestep input vector
             prev_state: prev hidden state w/ shape [B, H].
         Returns:
             features, new_state.
         """
-        zr_from_x = self._x2zr(input_vec)
+        assert len(list(inputs.shape)) == 2
+        zr_from_x = self._x2zr(inputs)
         zr_from_h = self._h2zr(prev_state)
         if self._use_ln:
             zr_from_x = self._x2zr_ln(zr_from_x)
