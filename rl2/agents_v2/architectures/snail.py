@@ -208,6 +208,9 @@ class SNAIL(tc.nn.Module):
             num_head_features=self._feature_dim,
             connection_style='dense')
 
+    def initial_state(self, batch_size: int) -> None:
+        return None
+
     def forward(
         self,
         inputs: tc.FloatTensor,

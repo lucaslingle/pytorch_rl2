@@ -17,7 +17,7 @@ class StatefulValueNet(tc.nn.Module, Generic[ArchitectureState]):
         self._architecture = architecture
         self._value_head = value_head
 
-    def initial_state(self, batch_size: int) -> tc.FloatTensor:
+    def initial_state(self, batch_size: int) -> Optional[tc.FloatTensor]:
         return self._architecture.initial_state(batch_size=batch_size)
 
     def forward(
