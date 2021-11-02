@@ -51,7 +51,7 @@ class CausalConv(tc.nn.Module):
         """
         Args:
             present_inputs: present input tensor of shape [B, T2, F]
-            past_inputs: present input tensor of shape [B, T1, F]
+            past_inputs: optional past input tensor of shape [B, T1, F]
 
         Returns:
             Causal convolution of the (padded) present inputs.
