@@ -50,8 +50,8 @@ class CausalConv(tc.nn.Module):
     ) -> tc.FloatTensor:
         """
         Args:
-            present_inputs: present input tensor of shape [B, T2, F]
-            past_inputs: optional past input tensor of shape [B, T1, F]
+            present_inputs: present input tensor of shape [B, T2, I]
+            past_inputs: optional past input tensor of shape [B, T1, I]
 
         Returns:
             Causal convolution of the (padded) present inputs.
@@ -146,6 +146,7 @@ class TCBlock(tc.nn.Module):
         self._kernel_size = kernel_size
         self._dilation_rate = dilation_rate
         self._context_size = context_size
+        self._use_ln = use_ln
 
         self._dense_blocks = tc.nn.ModuleList([
             DenseBlock(
