@@ -185,26 +185,25 @@ class SNAIL(tc.nn.Module):
         self._feature_dim = feature_dim
         self._context_size = context_size
 
-        self._tc1_input_dim = self._input_dim
         self._tc1 = TCBlock(
-            input_dim=self._tc1_input_dim,
+            input_dim=self._input_dim,
             feature_dim=self._feature_dim,
             context_size=self._context_size,
             use_ln=True)
 
-        self._tc2_input_dim = self._input_dim + \
-                              self._tc1.num_layers * self._feature_dim
+        self._tc1_output_dim = self._input_dim + \
+                               self._tc1.num_layers * self._feature_dim
         self._tc2 = TCBlock(
-            input_dim=self._tc2_input_dim,
+            input_dim=self._tc1_output_dim,
             feature_dim=self._feature_dim,
             context_size=self._context_size,
             use_ln=True)
 
-        self._attn_input_dim = self._input_dim + \
+        self._tc2_output_dim = self._input_dim + \
                                self._tc1.num_layers * self._feature_dim + \
                                self._tc2.num_layers * self._feature_dim
         self._attn = MultiheadSelfAttention(
-            input_dim=self._attn_input_dim,
+            input_dim=self._tc2_output_dim,
             num_heads=1,
             num_head_features=self._feature_dim,
             connection_style='dense')
@@ -232,13 +231,13 @@ class SNAIL(tc.nn.Module):
             inputs = inputs.unsqueeze(1)
 
         tc1_out = self._tc1(
-            inputs=inputs, past_inputs=prev_state[:, :, 0:self._tc1_input_dim])
+            inputs=inputs, past_inputs=prev_state[:, :, 0:self._tc1_output_dim])
 
         tc2_out = self._tc2(
-            inputs=tc1_out, past_inputs=prev_state[:, :, 0:self._tc2_input_dim])
+            inputs=tc1_out, past_inputs=prev_state[:, :, 0:self._tc2_output_dim])
 
         attn_out, new_attn_kv = self._attn(
-            presents=tc2_out, past_kvs=prev_state[:, :, self._tc2_input_dim:])
+            presents=tc2_out, past_kvs=prev_state[:, :, self._tc2_output_dim:])
 
         features = attn_out
         new_state = tc.cat((tc2_out, new_attn_kv), dim=-1)
