@@ -161,7 +161,7 @@ class TCBlock(tc.nn.Module):
             else:
                 past_inputs = tc.cat(
                     tc.unbind(past_activations[:, 0:l]),
-                    dim=-1)  # [B, T1, L*F]
+                    dim=-1)  # [B, T1, l*F]
 
             present_inputs = tc.cat(
                 tc.unbind(present_activations[:, 0:l]),
@@ -170,7 +170,7 @@ class TCBlock(tc.nn.Module):
 
             output = self._dense_blocks[l](
                 present_inputs=present_inputs,
-                past_inputs=past_inputs)  # [B, T2, F2]
+                past_inputs=past_inputs)  # [B, T2, F]
 
             present_activations = tc.cat(
                 (present_activations, output.unsqueeze(1)),
@@ -178,3 +178,11 @@ class TCBlock(tc.nn.Module):
 
         return present_activations  # [B, L+1, T2, F]
 
+# make two classes, TCActivations and TCState.
+# TCActivations will contain activations from a given TCBlock on the present
+# (with whatever optional past context it used).
+# TCState will store the combined state, so that it can be used as pasts in the future.
+
+# after return,
+# TCActivations will contain L tensors of shape [B, T2, F].
+# TCState will contain one tensor of shape [B, T1+F2, F'], and L tensors of shape [B, T1+T2, F].
