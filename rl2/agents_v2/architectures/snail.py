@@ -132,7 +132,13 @@ class DenseBlock(tc.nn.Module):
 
 class TCBlock(tc.nn.Module):
     def __init__(
-        self, input_dim, feature_dim, kernel_size, dilation_rate, context_size
+            self,
+            input_dim,
+            feature_dim,
+            kernel_size,
+            dilation_rate,
+            context_size,
+            use_ln=True
     ):
         super().__init__()
         self._input_dim = input_dim
@@ -141,32 +147,35 @@ class TCBlock(tc.nn.Module):
         self._dilation_rate = dilation_rate
         self._context_size = context_size
 
-        # TODO(lucaslingle):
-        # implement CausalConv, DenseBlock,
-        # and put a ModuleList of DenseBlocks here
-        self._dense_blocks = tc.nn.ModuleList()
+        self._dense_blocks = tc.nn.ModuleList([
+            DenseBlock(
+                input_dim=(self._input_dim + l * self._feature_dim),
+                feature_dim=self._feature_dim,
+                kernel_size=2,
+                dilation_rate=2 ** l,
+                use_ln=self._use_ln)
+            for l in range(0, self.num_layers)
+        ])
 
     @property
     def num_layers(self):
         raise NotImplementedError
 
     def forward(self, input_vec, prev_state):
-        past_activations = prev_state  # [B, L, T1, F]
-        present_activations = input_vec.unsqueeze(1)  # [B, 1, T2, F]
-        num_layers = self.num_layers()
+        if len(list(input_vec.shape)) == 2:
+            input_vec = input_vec.unsqueeze(1)
 
-        for l in range(1, num_layers+1):  # 1, ..., num_layers
+        past_activations = prev_state  # [B, T1, I+(L-1)*F]
+        present_activations = input_vec  # [B, T2, I]
+
+        for l in range(0, self.num_layers):  # 0, ..., num_layers-1
             if past_activations is None:
                 past_inputs = None
             else:
-                past_inputs = tc.cat(
-                    tc.unbind(past_activations[:, 0:l]),
-                    dim=-1)  # [B, T1, l*F]
+                end_idx = self._input_dim + l * self._feature_dim
+                past_inputs = past_activations[:, :, 0:end_idx] # [B, T2, I+l*F]
 
-            present_inputs = tc.cat(
-                tc.unbind(present_activations[:, 0:l]),
-                dim=-1
-            )  # [B, T2, l*F]
+            present_inputs = present_activations
 
             output = self._dense_blocks[l](
                 present_inputs=present_inputs,
@@ -174,15 +183,6 @@ class TCBlock(tc.nn.Module):
 
             present_activations = tc.cat(
                 (present_activations, output.unsqueeze(1)),
-                dim=1)  # [B, l+1, T2, F]
+                dim=1)  # [B, T2, I+(l+1)*F]
 
-        return present_activations  # [B, L+1, T2, F]
-
-# make two classes, TCActivations and TCState.
-# TCActivations will contain activations from a given TCBlock on the present
-# (with whatever optional past context it used).
-# TCState will store the combined state, so that it can be used as pasts in the future.
-
-# after return,
-# TCActivations will contain L tensors of shape [B, T2, F].
-# TCState will contain one tensor of shape [B, T1+F2, F'], and L tensors of shape [B, T1+T2, F].
+        return present_activations  # [B, T2, I+L*F]
