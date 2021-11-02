@@ -183,7 +183,7 @@ class TCBlock(tc.nn.Module):
                 past_inputs=past_inputs)  # [B, T2, F]
 
             present_activations = tc.cat(
-                (present_activations, output.unsqueeze(1)),
-                dim=1)  # [B, T2, I+(l+1)*F]
+                (present_activations, output),
+                dim=-1)  # [B, T2, I+(l+1)*F]
 
         return present_activations  # [B, T2, I+L*F]
