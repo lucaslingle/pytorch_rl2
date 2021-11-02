@@ -173,9 +173,9 @@ class TCBlock(tc.nn.Module):
                 past_inputs = None
             else:
                 end_idx = self._input_dim + l * self._feature_dim
-                past_inputs = past_activations[:, :, 0:end_idx] # [B, T2, I+l*F]
+                past_inputs = past_activations[:, :, 0:end_idx]  # [B, T1, I+l*F]
 
-            present_inputs = present_activations
+            present_inputs = present_activations  # [B, T2, I+l*F]
 
             output = self._dense_blocks[l](
                 present_inputs=present_inputs,
