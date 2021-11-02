@@ -1,5 +1,5 @@
 """
-Implements training loop for the bandit agent from Duan et al., 2016
+Implements training loop for the mdp agent from Duan et al., 2016
 - 'RL^2: Fast Reinforcement Learning via Slow Reinforcement Learning'
 """
 
@@ -8,8 +8,8 @@ from functools import partial
 
 import torch as tc
 
-from rl2.envs.bandit_env import BanditEnv
-from rl2.agents_v2.preprocessing.tabular import MABPreprocessing
+from rl2.envs.mdp_env import MDPEnv
+from rl2.agents_v2.preprocessing.tabular import MDPPreprocessing
 from rl2.agents_v2.architectures.gru import GRU
 from rl2.agents_v2.heads.policy_heads import LinearPolicyHead
 from rl2.agents_v2.heads.value_heads import LinearValueHead
@@ -25,16 +25,18 @@ from rl2.utils.optim_util import get_weight_decay_param_groups
 
 def create_argparser():
     parser = argparse.ArgumentParser(
-        description="""Training script for RL^2 bandit agent.""")
-    parser.add_argument("--max_pol_iters", type=int, default=600)
+        description="""Training script for RL^2 MDP agent.""")
+    parser.add_argument("--max_pol_iters", type=int, default=12000)
+    parser.add_argument("--num_states", type=int, default=10)
     parser.add_argument("--num_actions", type=int, default=5)
     parser.add_argument("--num_features", type=int, default=256)
     parser.add_argument("--forget_bias", type=float, default=1.0)
     parser.add_argument("--model_name", type=str, default='defaults')
     parser.add_argument("--checkpoint_dir", type=str, default='checkpoints')
     parser.add_argument("--checkpoint_interval", type=int, default=10)
+    parser.add_argument("--episode_len", type=int, default=10)
     parser.add_argument("--episodes_per_meta_episode", type=int, default=10)
-    parser.add_argument("--meta_episodes_per_policy_update", type=int, default=30000//10)
+    parser.add_argument("--meta_episodes_per_policy_update", type=int, default=30000//100)
     parser.add_argument("--meta_episodes_per_actor_batch", type=int, default=60)
     parser.add_argument("--ppo_opt_epochs", type=int, default=8)
     parser.add_argument("--ppo_clip_param", type=float, default=0.10)
@@ -54,13 +56,18 @@ def main():
     comm = get_comm()
 
     # create env.
-    env = BanditEnv(num_actions=args.num_actions)
+    env = MDPEnv(
+        num_states=args.num_states,
+        num_actions=args.num_actions,
+        max_episode_length=args.episode_len)
 
     # create learning system.
     policy_net = StatefulPolicyNet(
-        preprocessing=MABPreprocessing(num_actions=args.num_actions),
+        preprocessing=MDPPreprocessing(
+            num_actions=args.num_actions,
+            num_states=args.num_states),
         architecture=GRU(
-            input_dim=args.num_actions+2,
+            input_dim=args.num_states+args.num_actions+2,
             hidden_dim=args.num_features,
             forget_bias=args.forget_bias,
             use_ln=True,
@@ -71,9 +78,11 @@ def main():
     )
 
     value_net = StatefulValueNet(
-        preprocessing=MABPreprocessing(num_actions=args.num_actions),
+        preprocessing=MDPPreprocessing(
+            num_actions=args.num_actions,
+            num_states=args.num_states),
         architecture=GRU(
-            input_dim=args.num_actions+2,
+            input_dim=args.num_states+args.num_actions+2,
             hidden_dim=args.num_features,
             forget_bias=args.forget_bias,
             use_ln=True,
@@ -159,7 +168,7 @@ def main():
         value_optimizer=value_optimizer,
         policy_scheduler=policy_scheduler,
         value_scheduler=value_scheduler,
-        episode_len=1,
+        episode_len=args.episode_len,
         episodes_per_meta_episode=args.episodes_per_meta_episode,
         meta_episodes_per_actor_batch=args.meta_episodes_per_actor_batch,
         meta_episodes_per_policy_update=args.meta_episodes_per_policy_update,
