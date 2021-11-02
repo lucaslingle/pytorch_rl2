@@ -234,7 +234,7 @@ class SNAIL(tc.nn.Module):
         tc1_out = self._tc1(
             inputs=inputs, past_inputs=prev_state[0:self._tc1_input_dim])
 
-        tc2_out = self._tcb2(
+        tc2_out = self._tc2(
             inputs=tc1_out, past_inputs=prev_state[0:self._tc2_input_dim])
 
         attn_out, new_attn_kv = self._attn(
