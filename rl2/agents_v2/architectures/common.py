@@ -35,6 +35,7 @@ class LayerNorm(tc.nn.Module):
 def masked_self_attention(q, k, v):
     # TODO(lucaslingle):
     # implement parameterless version of causal self attention here
+    # pay attention to the case where k/v length greater than q length
     raise NotImplementedError
 
 
@@ -52,9 +53,6 @@ class MultiheadSelfAttention(tc.nn.Module):
         self._num_heads = num_heads
         self._num_head_features = num_head_features
         self._connection_style = connection_style
-
-        # TODO(lucaslingle):
-        # add linear modules and forward method that supports optional memory tensor
 
         self._qkv_linear = tc.nn.Linear(
             in_features=self._input_dim,
