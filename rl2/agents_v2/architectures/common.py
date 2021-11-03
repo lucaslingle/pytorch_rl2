@@ -93,7 +93,7 @@ class MultiheadSelfAttention(tc.nn.Module):
             [qs, ks, vs]))
 
         attn_output = masked_self_attention(qs, ks, vs)
-        attn_output = tc.cat(tc.chunk(attn_output, self._num_heads, 0), dim=-1)
+        attn_output = tc.cat(tc.chunk(attn_output, self._num_heads, dim=0), dim=-1)
 
         if self._connection_style == 'plain':
             output = attn_output
