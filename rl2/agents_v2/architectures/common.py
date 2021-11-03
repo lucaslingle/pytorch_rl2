@@ -70,27 +70,40 @@ class MultiheadSelfAttention(tc.nn.Module):
             tc.nn.init.xavier_normal_(self._proj_linear.weight)
 
     def forward(self, inputs, past_kvs=None):
+        """
+        Args:
+            inputs: present input tensor with shape [B, T2, I]
+            past_kvs: optional past kvs with shape [B, T1, H*F*2]
+
+        Returns:
+            output tensor with shape determined by self._connection_style
+        """
         qkv = self._qkv_linear(inputs)
-        qkv_list = tc.chunk(qkv, 3, dim=-1)
-        qs, ks, vs = list(map(
-            lambda x: tc.cat(tc.chunk(x, self._num_heads, dim=-1), dim=0),
-            qkv_list))
+        qs, ks, vs = tc.chunk(qkv, 3, dim=-1)
 
         if past_kvs is not None:
             past_ks, past_vs = tc.chunk(past_kvs, 2, dim=-1)
             ks = tc.cat((past_ks, ks), dim=1)
             vs = tc.cat((past_vs, vs), dim=1)
 
+        new_kvs = tc.cat((ks, vs), dim=-1)  # [B, T1+T2, H*F*2]
+
+        qs, ks, vs = list(map(
+            lambda x: tc.cat(tc.chunk(x, self._num_heads, dim=-1), dim=0),
+            [qs, ks, vs]))
+
         attn_output = masked_self_attention(qs, ks, vs)
         attn_output = tc.cat(tc.chunk(attn_output, self._num_heads, 0), dim=-1)
 
         if self._connection_style == 'plain':
-            return attn_output
+            output = attn_output
         elif self._connection_style == 'residual':
-            return inputs + self._proj_linear(attn_output)
+            output = inputs + self._proj_linear(attn_output)
         elif self._connection_style == 'dense':
-            return tc.cat((inputs, attn_output), dim=-1)
+            output = tc.cat((inputs, attn_output), dim=-1)
         else:
             raise NotImplementedError
+
+        return output, new_kvs
 
 
