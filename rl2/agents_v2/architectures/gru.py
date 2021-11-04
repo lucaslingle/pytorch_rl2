@@ -117,7 +117,7 @@ class GRU(tc.nn.Module):
                 hhat = hhat_from_x + hhat_from_h
 
             hhat = tc.nn.ReLU()(hhat)
-            h_new = (1. - z) * prev_state + z * hhat
+            h_new = (1. - z) * h_prev + z * hhat
 
             features_by_timestep.append(h_new)
             state = h_new
