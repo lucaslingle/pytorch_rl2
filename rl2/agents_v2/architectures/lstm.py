@@ -72,7 +72,7 @@ class LSTM(tc.nn.Module):
         state = prev_state
         for t in range(0, T):  # 0, ..., T-1
             h_prev, c_prev = tc.chunk(state, 2, dim=-1)
-            fioj_from_x = self._x2fioj(inputs)
+            fioj_from_x = self._x2fioj(inputs[:,t,:])
             fioj_from_h = self._h2fioj(h_prev)
             if self._use_ln:
                 fioj_from_x = self._x2fioj_ln(fioj_from_x)
