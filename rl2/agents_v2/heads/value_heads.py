@@ -18,6 +18,7 @@ class LinearValueHead(tc.nn.Module):
             out_features=1,
             bias=True)
         tc.nn.init.xavier_normal_(self._linear.weight)
+        tc.nn.init.zeros_(self._linear.bias)
 
     def forward(self, features: tc.FloatTensor) -> tc.FloatTensor:
         """
