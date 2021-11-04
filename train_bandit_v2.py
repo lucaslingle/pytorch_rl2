@@ -15,7 +15,7 @@ from rl2.agents_v2.heads.policy_heads import LinearPolicyHead
 from rl2.agents_v2.heads.value_heads import LinearValueHead
 from rl2.agents_v2.integration.policy_net import StatefulPolicyNet
 from rl2.agents_v2.integration.value_net import StatefulValueNet
-from rl2.algos_v2.ppo import training_loop
+from rl2.algos_v2.ppo_v2 import training_loop
 
 from rl2.utils.checkpoint_util import maybe_load_checkpoint, save_checkpoint
 from rl2.utils.comm_util import get_comm, sync_state
@@ -30,7 +30,7 @@ def create_argparser():
     parser.add_argument("--num_actions", type=int, default=5)
     parser.add_argument("--num_features", type=int, default=256)
     parser.add_argument("--forget_bias", type=float, default=1.0)
-    parser.add_argument("--model_name", type=str, default='defaults')
+    parser.add_argument("--model_name", type=str, default='defaults_v2')
     parser.add_argument("--checkpoint_dir", type=str, default='checkpoints')
     parser.add_argument("--checkpoint_interval", type=int, default=10)
     parser.add_argument("--episodes_per_meta_episode", type=int, default=10)
