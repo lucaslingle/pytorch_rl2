@@ -25,6 +25,8 @@ class GRU(tc.nn.Module):
             out_features=(2 * self._hidden_dim),
             bias=(not self._use_ln))
         tc.nn.init.xavier_normal_(self._x2zr.weight)
+        if not self._use_ln:
+            tc.nn.init.zeros_(self._x2zr.bias)
 
         self._h2zr = tc.nn.Linear(
             in_features=self._hidden_dim,
@@ -37,6 +39,8 @@ class GRU(tc.nn.Module):
             out_features=self._hidden_dim,
             bias=(not self._use_ln))
         tc.nn.init.xavier_normal_(self._x2hhat.weight)
+        if not self._use_ln:
+            tc.nn.init.zeros_(self._x2hhat.bias)
 
         self._h2hhat = tc.nn.Linear(
             in_features=self._hidden_dim,
@@ -119,5 +123,8 @@ class GRU(tc.nn.Module):
             state = h_new
 
         features = tc.stack(features_by_timestep, dim=1)
+        if T == 1:
+            features = features.squeeze(1)
         new_state = state
+
         return features, new_state

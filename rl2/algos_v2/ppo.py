@@ -51,6 +51,7 @@ def compute_losses(
             return tc.LongTensor(mb_field)
         return tc.FloatTensor(mb_field)
 
+    # minibatch data tensors
     mb_obs = get_tensor('obs', 'long')
     mb_acs = get_tensor('acs', 'long')
     mb_rews = get_tensor('rews')
@@ -59,11 +60,8 @@ def compute_losses(
     mb_advs = get_tensor('advs')
     mb_tdlam_rets = get_tensor('tdlam_rets')
 
-    # we are going to manually loop over the timesteps here,
-    # for backprop thru time.
+    # input for loss calculations
     B = len(meta_episodes)
-    T = len(meta_episodes[0].acs)
-
     ac_dummy = tc.zeros(dtype=tc.int64, size=(B,))
     rew_dummy = tc.zeros(dtype=tc.float32, size=(B,))
     done_dummy = tc.ones(dtype=tc.float32, size=(B,))
@@ -75,6 +73,7 @@ def compute_losses(
     prev_state_policy_net = policy_net.initial_state(batch_size=B)
     prev_state_value_net = value_net.initial_state(batch_size=B)
 
+    # forward pass implements unroll for recurrent/attentive architectures.
     pi_dists, _ = policy_net(
         curr_obs=curr_obs,
         prev_action=prev_action,

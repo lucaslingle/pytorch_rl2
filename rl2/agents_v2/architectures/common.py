@@ -28,8 +28,8 @@ class LayerNorm(tc.nn.Module):
             g = g.unsqueeze(0)
             b = b.unsqueeze(0)
 
-        scaled_x = g * standardized + b
-        return scaled_x
+        scaled = g * standardized + b
+        return scaled
 
 
 def masked_self_attention(q, k, v):
