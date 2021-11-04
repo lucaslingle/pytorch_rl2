@@ -68,9 +68,9 @@ class GRU(tc.nn.Module):
         prev_state: tc.FloatTensor
     ) -> Tuple[tc.FloatTensor, tc.FloatTensor]:
         """
-        Run recurrent state update.
+        Run recurrent state update, compute features.
         Args:
-            inputs: current timestep input tensor of shape [B, ..., ?]
+            inputs: input vec tensor with shape [B, ..., ?]
             prev_state: prev hidden state w/ shape [B, H].
         Notes:
             '...' must be either one dimensional or must not exist.
