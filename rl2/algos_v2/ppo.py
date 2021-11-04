@@ -69,11 +69,11 @@ def compute_losses(
     done_dummy = tc.ones(dtype=tc.float32, size=(B,))
 
     curr_obs = mb_obs
-    prev_action = tc.cat((ac_dummy.unsqueeze(1), mb_acs[:,:-1,:]), dim=-1)
-    prev_reward = tc.cat((rew_dummy.unsqueeze(1), mb_rews[:, :-1, :]), dim=-1)
-    prev_done = tc.cat((done_dummy.unsqueeze(1), mb_dones[:, :-1, :]), dim=-1)
-    prev_state_policy_net = policy_net.prev_state(batch_size=B)
-    prev_state_value_net = value_net.prev_state(batch_size=B)
+    prev_action = tc.cat((ac_dummy.unsqueeze(1), mb_acs[:, :-1]), dim=-1)
+    prev_reward = tc.cat((rew_dummy.unsqueeze(1), mb_rews[:, :-1]), dim=-1)
+    prev_done = tc.cat((done_dummy.unsqueeze(1), mb_dones[:, :-1]), dim=-1)
+    prev_state_policy_net = policy_net.initial_state(batch_size=B)
+    prev_state_value_net = value_net.initial_state(batch_size=B)
 
     pi_dists, _ = policy_net(
         curr_obs=curr_obs,
