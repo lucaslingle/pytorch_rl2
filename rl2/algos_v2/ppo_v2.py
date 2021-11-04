@@ -107,7 +107,6 @@ def compute_losses(
     policy_loss = -(policy_surrogate_objective + policy_entropy_bonus)
 
     # value loss
-    #value_loss = tc.mean(tc.square(mb_tdlam_rets - vpreds_new))
     value_loss = tc.mean(huber_func(mb_tdlam_rets, vpreds_new))
 
     # clipfrac

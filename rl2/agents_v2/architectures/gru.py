@@ -103,14 +103,14 @@ class GRU(tc.nn.Module):
 
             if self._reset_after:
                 hhat_from_x = self._x2hhat(inputs[:,t,:])
-                hhat_from_h = self._h2hhat(prev_state)
+                hhat_from_h = self._h2hhat(h_prev)
                 if self._use_ln:
                     hhat_from_x = self._x2hhat_ln(hhat_from_x)
                     hhat_from_h = self._h2hhat_ln(hhat_from_h)
                 hhat = hhat_from_x + r * hhat_from_h
             else:
                 hhat_from_x = self._x2hhat(inputs[:,t,:])
-                hhat_from_h = self._h2hhat(r * prev_state)
+                hhat_from_h = self._h2hhat(r * h_prev)
                 if self._use_ln:
                     hhat_from_x = self._x2hhat_ln(hhat_from_x)
                     hhat_from_h = self._h2hhat_ln(hhat_from_h)
