@@ -11,7 +11,11 @@ from rl2.agents_v2.architectures.common import LayerNorm
 
 class LSTM(tc.nn.Module):
     def __init__(
-        self, input_dim, hidden_dim, forget_bias=1.0, use_ln=True
+        self,
+        input_dim,
+        hidden_dim,
+        forget_bias=1.0,
+        use_ln=True
     ):
         super().__init__()
         self._input_dim = input_dim

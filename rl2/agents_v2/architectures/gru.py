@@ -11,7 +11,12 @@ from rl2.agents_v2.architectures.common import LayerNorm
 
 class GRU(tc.nn.Module):
     def __init__(
-        self, input_dim, hidden_dim, forget_bias=1.0, use_ln=True, reset_after=True
+        self,
+        input_dim,
+        hidden_dim,
+        forget_bias=1.0,
+        use_ln=True,
+        reset_after=True
     ):
         super().__init__()
         self._input_dim = input_dim
