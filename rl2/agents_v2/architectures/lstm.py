@@ -63,10 +63,9 @@ class LSTM(tc.nn.Module):
         Run recurrent state update, compute features.
         Args:
             inputs: input vec tensor with shape [B, ..., ?]
-            prev_state: prev hidden state w/ shape [B, H].
+            prev_state: prev lstm state w/ shape [B, 2*H].
         Notes:
             '...' must be either one dimensional or must not exist.
-            prev_state: prev lstm state w/ shape [B, 2*H].
         Returns:
             features, new_state.
         """

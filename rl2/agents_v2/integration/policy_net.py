@@ -17,7 +17,7 @@ class StatefulPolicyNet(tc.nn.Module, Generic[ArchitectureState]):
         self._architecture = architecture
         self._policy_head = policy_head
 
-    def initial_state(self, batch_size: int) -> Optional[tc.FloatTensor]:
+    def initial_state(self, batch_size: int) -> Optional[ArchitectureState]:
         return self._architecture.initial_state(batch_size=batch_size)
 
     def forward(
