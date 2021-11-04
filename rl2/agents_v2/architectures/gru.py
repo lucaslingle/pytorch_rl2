@@ -70,39 +70,51 @@ class GRU(tc.nn.Module):
         """
         Run recurrent state update.
         Args:
-            inputs: current timestep input vector
+            inputs: current timestep input tensor of shape [B, ..., ?]
             prev_state: prev hidden state w/ shape [B, H].
+        Notes:
+            '...' must be either one dimensional or must not exist.
         Returns:
             features, new_state.
         """
-        assert len(list(inputs.shape)) == 2
-        zr_from_x = self._x2zr(inputs)
-        zr_from_h = self._h2zr(prev_state)
-        if self._use_ln:
-            zr_from_x = self._x2zr_ln(zr_from_x)
-            zr_from_h = self._h2zr_ln(zr_from_h)
-        zr = zr_from_x + zr_from_h
-        z, r = tc.chunk(zr, 2, dim=-1)
+        assert len(list(inputs.shape)) in [2, 3]
+        if len(list(inputs.shape)) == 2:
+            inputs = inputs.unsqueeze(1)
 
-        z = tc.nn.Sigmoid()(z-self._forget_bias)
-        r = tc.nn.Sigmoid()(r)
-
-        if self._reset_after:
-            hhat_from_x = self._x2hhat(inputs)
-            hhat_from_h = self._h2hhat(prev_state)
+        T = inputs.shape[1]
+        state = prev_state
+        for t in range(0, T):  # 0, ..., T-1
+            h_prev = state
+            zr_from_x = self._x2zr(inputs[:,t,:])
+            zr_from_h = self._h2zr(h_prev)
             if self._use_ln:
-                hhat_from_x = self._x2hhat_ln(hhat_from_x)
-                hhat_from_h = self._h2hhat_ln(hhat_from_h)
-            hhat = hhat_from_x + r * hhat_from_h
-        else:
-            hhat_from_x = self._x2hhat(inputs)
-            hhat_from_h = self._h2hhat(r * prev_state)
-            if self._use_ln:
-                hhat_from_x = self._x2hhat_ln(hhat_from_x)
-                hhat_from_h = self._h2hhat_ln(hhat_from_h)
-            hhat = hhat_from_x + hhat_from_h
+                zr_from_x = self._x2zr_ln(zr_from_x)
+                zr_from_h = self._h2zr_ln(zr_from_h)
+            zr = zr_from_x + zr_from_h
+            z, r = tc.chunk(zr, 2, dim=-1)
 
-        hhat = tc.nn.ReLU()(hhat)
+            z = tc.nn.Sigmoid()(z-self._forget_bias)
+            r = tc.nn.Sigmoid()(r)
 
-        h_new = (1. - z) * prev_state + z * hhat
-        return h_new, h_new
+            if self._reset_after:
+                hhat_from_x = self._x2hhat(inputs[:,t,:])
+                hhat_from_h = self._h2hhat(prev_state)
+                if self._use_ln:
+                    hhat_from_x = self._x2hhat_ln(hhat_from_x)
+                    hhat_from_h = self._h2hhat_ln(hhat_from_h)
+                hhat = hhat_from_x + r * hhat_from_h
+            else:
+                hhat_from_x = self._x2hhat(inputs[:,t,:])
+                hhat_from_h = self._h2hhat(r * prev_state)
+                if self._use_ln:
+                    hhat_from_x = self._x2hhat_ln(hhat_from_x)
+                    hhat_from_h = self._h2hhat_ln(hhat_from_h)
+                hhat = hhat_from_x + hhat_from_h
+
+            hhat = tc.nn.ReLU()(hhat)
+            h_new = (1. - z) * prev_state + z * hhat
+            state = h_new
+
+        features = h_new
+        new_state = state
+        return features, new_state

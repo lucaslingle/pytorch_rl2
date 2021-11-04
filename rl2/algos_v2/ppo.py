@@ -67,48 +67,31 @@ def compute_losses(
     ac_dummy = tc.zeros(dtype=tc.int64, size=(B,))
     rew_dummy = tc.zeros(dtype=tc.float32, size=(B,))
     done_dummy = tc.ones(dtype=tc.float32, size=(B,))
-    h_tm1_policy_net = policy_net.initial_state(batch_size=B)  # will be ref var
-    h_tm1_value_net = value_net.initial_state(batch_size=B)    # will be ref var
 
-    entropies = []
-    logpacs_new = []
-    vpreds_new = []
-    for t in range(0, T):
-        o_t = mb_obs[:, t]
-        a_tm1 = ac_dummy if t == 0 else mb_acs[:, t-1]
-        r_tm1 = rew_dummy if t == 0 else mb_rews[:, t-1]
-        d_tm1 = done_dummy if t == 0 else mb_dones[:, t-1]
+    curr_obs = mb_obs
+    prev_action = tc.cat((ac_dummy.unsqueeze(1), mb_acs[:,:-1,:]), dim=-1)
+    prev_reward = tc.cat((rew_dummy.unsqueeze(1), mb_rews[:, :-1, :]), dim=-1)
+    prev_done = tc.cat((done_dummy.unsqueeze(1), mb_dones[:, :-1, :]), dim=-1)
+    prev_state_policy_net = policy_net.prev_state(batch_size=B)
+    prev_state_value_net = value_net.prev_state(batch_size=B)
 
-        pi_dist_t, h_t_policy_net = policy_net(
-            curr_obs=o_t,
-            prev_action=a_tm1,
-            prev_reward=r_tm1,
-            prev_done=d_tm1,
-            prev_state=h_tm1_policy_net)
+    pi_dists, _ = policy_net(
+        curr_obs=curr_obs,
+        prev_action=prev_action,
+        prev_reward=prev_reward,
+        prev_done=prev_done,
+        prev_state=prev_state_policy_net)
 
-        vpred_t, h_t_value_net = value_net(
-            curr_obs=o_t,
-            prev_action=a_tm1,
-            prev_reward=r_tm1,
-            prev_done=d_tm1,
-            prev_state=h_tm1_value_net)
+    vpreds, _ = value_net(
+        curr_obs=curr_obs,
+        prev_action=prev_action,
+        prev_reward=prev_reward,
+        prev_done=prev_done,
+        prev_state=prev_state_value_net)
 
-        ent_t = pi_dist_t.entropy()
-        entropies.append(ent_t)
-
-        a_t = mb_acs[:, t]
-        logprob_a_t_new = pi_dist_t.log_prob(a_t)
-        logpacs_new.append(logprob_a_t_new)
-
-        vpreds_new.append(vpred_t)
-
-        h_tm1_policy_net = h_t_policy_net
-        h_tm1_value_net = h_t_value_net
-
-    # assemble relevant gradient-tracked quantities from our loop above.
-    entropies = tc.stack(entropies, dim=1)
-    logpacs_new = tc.stack(logpacs_new, dim=1)
-    vpreds_new = tc.stack(vpreds_new, dim=1)
+    entropies = pi_dists.entropy()
+    logpacs_new = pi_dists.log_prob(mb_acs)
+    vpreds_new = vpreds
 
     # entropy bonus
     meanent = tc.mean(entropies)
@@ -125,7 +108,6 @@ def compute_losses(
     policy_loss = -(policy_surrogate_objective + policy_entropy_bonus)
 
     # value loss
-    #value_loss = tc.mean(tc.square(mb_tdlam_rets - vpreds_new))
     value_loss = tc.mean(huber_func(mb_tdlam_rets, vpreds_new))
 
     # clipfrac

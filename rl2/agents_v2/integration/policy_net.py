@@ -40,9 +40,7 @@ class StatefulPolicyNet(tc.nn.Module, Generic[ArchitectureState]):
             prev_state: the architecture's previous state.
 
         Notes:
-            '...' must be either one dimensional or must not exist;
-            for recurrent architectures, it should not exist;
-            for attentive architectures, it should be the length of presents.
+            '...' must be either one dimensional or must not exist
 
         Returns:
             Tuple containing policy distribution(s) with batch shape [B, ...]

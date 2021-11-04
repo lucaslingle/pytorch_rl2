@@ -61,22 +61,29 @@ class LSTM(tc.nn.Module):
         Returns:
             features, new_state.
         """
-        assert len(list(inputs.shape)) == 2
-        hidden_vec, c_prev = tc.chunk(prev_state, 2, dim=-1)
-        fioj_from_x = self._x2fioj(inputs)
-        fioj_from_h = self._h2fioj(hidden_vec)
-        if self._use_ln:
-            fioj_from_x = self._x2fioj_ln(fioj_from_x)
-            fioj_from_h = self._h2fioj_ln(fioj_from_h)
-        fioj = fioj_from_x + fioj_from_h
-        f, i, o, j = tc.chunk(fioj, 4, dim=-1)
-        f = tc.nn.Sigmoid()(f + self._forget_bias)
-        i = tc.nn.Sigmoid()(i)
-        o = tc.nn.Sigmoid()(o)
-        j = tc.nn.ReLU()(j)
-        c_new = f * c_prev + i * j
-        h_new = o * (self._c_out_ln(c_new) if self._use_ln else c_new)
+        assert len(list(inputs.shape)) in [2, 3]
+        if len(list(inputs.shape)) == 2:
+            inputs = inputs.unsqueeze(1)
+
+        T = inputs.shape[1]
+        state = prev_state
+        for t in range(0, T):  # 0, ..., T-1
+            h_prev, c_prev = tc.chunk(state, 2, dim=-1)
+            fioj_from_x = self._x2fioj(inputs)
+            fioj_from_h = self._h2fioj(h_prev)
+            if self._use_ln:
+                fioj_from_x = self._x2fioj_ln(fioj_from_x)
+                fioj_from_h = self._h2fioj_ln(fioj_from_h)
+            fioj = fioj_from_x + fioj_from_h
+            f, i, o, j = tc.chunk(fioj, 4, dim=-1)
+            f = tc.nn.Sigmoid()(f + self._forget_bias)
+            i = tc.nn.Sigmoid()(i)
+            o = tc.nn.Sigmoid()(o)
+            j = tc.nn.ReLU()(j)
+            c_new = f * c_prev + i * j
+            h_new = o * (self._c_out_ln(c_new) if self._use_ln else c_new)
+            state = tc.cat((h_new, c_new), dim=-1)
 
         features = h_new
-        new_state = tc.cat((h_new, c_new), dim=-1).float()
+        new_state = state
         return features, new_state
