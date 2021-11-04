@@ -82,6 +82,7 @@ class GRU(tc.nn.Module):
             inputs = inputs.unsqueeze(1)
 
         T = inputs.shape[1]
+        features_by_timestep = []
         state = prev_state
         for t in range(0, T):  # 0, ..., T-1
             h_prev = state
@@ -113,8 +114,10 @@ class GRU(tc.nn.Module):
 
             hhat = tc.nn.ReLU()(hhat)
             h_new = (1. - z) * prev_state + z * hhat
+
+            features_by_timestep.append(h_new)
             state = h_new
 
-        features = h_new
+        features = tc.stack(features_by_timestep, dim=1)
         new_state = state
         return features, new_state

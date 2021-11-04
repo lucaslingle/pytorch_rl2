@@ -69,6 +69,7 @@ class LSTM(tc.nn.Module):
             inputs = inputs.unsqueeze(1)
 
         T = inputs.shape[1]
+        features_by_timestep = []
         state = prev_state
         for t in range(0, T):  # 0, ..., T-1
             h_prev, c_prev = tc.chunk(state, 2, dim=-1)
@@ -85,8 +86,10 @@ class LSTM(tc.nn.Module):
             j = tc.nn.ReLU()(j)
             c_new = f * c_prev + i * j
             h_new = o * (self._c_out_ln(c_new) if self._use_ln else c_new)
+
+            features_by_timestep.append(h_new)
             state = tc.cat((h_new, c_new), dim=-1)
 
-        features = h_new
+        features = tc.stack(features_by_timestep, dim=1)
         new_state = state
         return features, new_state
