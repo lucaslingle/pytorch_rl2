@@ -168,7 +168,7 @@ class MultiheadSelfAttention(tc.nn.Module):
 
         if self._attention_style == 'rel':
             batch_size, src_len, d_model = inputs.shape[0], ks.shape[1], inputs.shape[-1]
-            r_mat = sinusoidal_embeddings(src_len, d_model)      # [T1+T2, D]
+            r_mat = sinusoidal_embeddings(src_len, d_model)      # [T1+T2, I]
             rs = self._r_linear(r_mat)                           # [T1+T2, H*F]
 
             rs = tc.tile(rs.unsqueeze(0), [batch_size, 1, 1])    # [B, T1+T2, H*F]
