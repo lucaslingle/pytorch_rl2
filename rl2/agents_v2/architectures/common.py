@@ -79,7 +79,7 @@ def relative_masked_self_attention(qs, ks, vs, rs, u_, v_):
     ac_qs = qs + u_
     bd_qs = qs + v_
     ac = tc.bmm(ac_qs, ks.permute(0, 2, 1))
-    bd = tc.einsum(bd_qs, rs.permute(0, 2, 1))
+    bd = tc.bmm(bd_qs, rs.permute(0, 2, 1))
     bd = rel_shift(bd)
 
     scores = ac + bd
