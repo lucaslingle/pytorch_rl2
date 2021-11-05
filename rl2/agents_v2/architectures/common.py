@@ -33,6 +33,7 @@ class LayerNorm(tc.nn.Module):
 
 
 def sinusoidal_embeddings(src_len, d_model):
+    # warning: for use with relative attention only
     pos_seq = tc.arange(src_len)[::-1]
     inv_freq = 1 / (10000 ** (tc.arange(0, d_model, 2) / d_model))
     sinusoid_input = pos_seq.view(-1, 1) * inv_freq.view(1, -1)
