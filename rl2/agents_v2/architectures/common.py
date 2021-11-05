@@ -63,8 +63,8 @@ def rel_shift(inputs):
     # this function implements the part of the shift from Dai et al., Appdx B,
     # but must be combined with subsequent causal masking to have correct effect
     input_shape = inputs.shape
-    zp = tc.zeros(size=(input_shape[0], 1, input_shape[2]), dtype=tc.float32)
-    inputs = tc.cat((zp, inputs), dim=1)
+    zp = tc.zeros(size=(input_shape[0], input_shape[1], 1), dtype=tc.float32)
+    inputs = tc.cat((zp, inputs), dim=2)
     inputs = tc.reshape(
         inputs, [input_shape[0], input_shape[2]+1, input_shape[1]])
     inputs = inputs[:, 1:, :]
