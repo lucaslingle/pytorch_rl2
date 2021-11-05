@@ -76,8 +76,8 @@ def relative_masked_self_attention(qs, ks, vs, rs, u_, v_):
     mask = get_mask(dest_len=qs.shape[1], src_len=ks.shape[1])
     mask = mask.view(1, *mask.shape)
 
-    ac_qs = qs + u_
-    bd_qs = qs + v_
+    ac_qs = qs + u_.unsqueeze(1)
+    bd_qs = qs + v_.unsqueeze(1)
     ac = tc.bmm(ac_qs, ks.permute(0, 2, 1))
     bd = tc.bmm(bd_qs, rs.permute(0, 2, 1))
     bd = rel_shift(bd)
@@ -164,7 +164,7 @@ class MultiheadSelfAttention(tc.nn.Module):
             r_mat = sinusoidal_embeddings(pos_seq, inv_freq).unsqueeze(0)
             rs = self._r_linear(r_mat)
 
-            rs = tc.tile(rs, [inputs.shape[0], 1])
+            rs = tc.tile(rs.unsqueeze(0), [inputs.shape[0], 1, 1])   # [B, T1+T2, H*F]
             u_ = tc.tile(self._u.unsqueeze(0), [inputs.shape[0], 1])
             v_ = tc.tile(self._v.unsqueeze(0), [inputs.shape[0], 1])
 
