@@ -162,27 +162,27 @@ class MultiheadSelfAttention(tc.nn.Module):
             past_ks, past_vs = tc.chunk(past_kvs, 2, dim=-1)
             ks = tc.cat((past_ks, ks), dim=1)
             vs = tc.cat((past_vs, vs), dim=1)
-        new_kvs = tc.cat((ks, vs), dim=-1)  # [B, T1+T2, H*F*2]
+        new_kvs = tc.cat((ks, vs), dim=-1)
 
-        qs, ks, vs = list(map(self.split_heads, [qs, ks, vs]))  # [B*H, ..., F]
+        qs, ks, vs = list(map(self.split_heads, [qs, ks, vs]))
 
         if self._attention_style == 'rel':
             batch_size, src_len, d_model = inputs.shape[0], ks.shape[1], inputs.shape[-1]
-            r_mat = sinusoidal_embeddings(src_len, d_model)[::-1, :]   # [T1+T2, I]
-            rs = self._r_linear(r_mat)                                 # [T1+T2, H*F]
+            r_mat = sinusoidal_embeddings(src_len, d_model)[::-1, :]
+            rs = self._r_linear(r_mat)
 
-            rs = tc.tile(rs.unsqueeze(0), [batch_size, 1, 1])    # [B, T1+T2, H*F]
-            u_ = tc.tile(self._u.unsqueeze(0), [batch_size, 1])  # [B, H*F]
-            v_ = tc.tile(self._v.unsqueeze(0), [batch_size, 1])  # [B, H*F]
+            rs = tc.tile(rs.unsqueeze(0), [batch_size, 1, 1])
+            u_ = tc.tile(self._u.unsqueeze(0), [batch_size, 1])
+            v_ = tc.tile(self._v.unsqueeze(0), [batch_size, 1])
 
-            rs, u_, v_ = list(map(self.split_heads, [rs, u_, v_]))  # [B*H, ..., F]
+            rs, u_, v_ = list(map(self.split_heads, [rs, u_, v_]))
 
             attn_output = relative_masked_self_attention(
-                qs, ks, vs, rs, u_, v_)   # [B*H, T2, F]
+                qs, ks, vs, rs, u_, v_)
         else:
-            attn_output = masked_self_attention(qs, ks, vs)   # [B*H, T2, F]
+            attn_output = masked_self_attention(qs, ks, vs)
 
-        attn_output = self.merge_heads(attn_output)  # [B, T2, H*F]
+        attn_output = self.merge_heads(attn_output)
 
         if self._connection_style == 'residual':
             attn_output = self._proj_linear(attn_output)
