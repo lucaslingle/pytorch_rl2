@@ -32,11 +32,24 @@ class LayerNorm(tc.nn.Module):
         return scaled
 
 
+def get_mask(dest_len, src_len):
+    i = tc.arange(dest_len).view(dest_len, 1)
+    j = tc.arange(src_len).view(1, src_len)
+    m = i >= j - (src_len - dest_len)
+    return m.int()
+
+
 def masked_self_attention(q, k, v):
-    # TODO(lucaslingle):
-    # implement parameterless version of causal self attention here
-    # pay attention to the case where k/v length greater than q length
-    raise NotImplementedError
+    mask = get_mask(dest_len=q.shape[1], src_len=k.shape[1])
+    mask = mask.view(1, *mask.shape)
+
+    scores = tc.bmm(q, k.permute(0, 2, 1))
+    scores /= tc.sqrt(q.shape[-1])
+    scores -= 1e10 * (1. - mask)
+    w = tc.nn.Softmax(dim=-1)(scores)  # [-1, T2, T1+T2]
+
+    output = tc.bmm(w, v)
+    return output
 
 
 class MultiheadSelfAttention(tc.nn.Module):
@@ -45,7 +58,8 @@ class MultiheadSelfAttention(tc.nn.Module):
             input_dim,
             num_heads,
             num_head_features,
-            connection_style
+            connection_style,
+            activation=None
     ):
         assert connection_style in ['plain', 'residual', 'dense']
         super().__init__()
@@ -53,6 +67,7 @@ class MultiheadSelfAttention(tc.nn.Module):
         self._num_heads = num_heads
         self._num_head_features = num_head_features
         self._connection_style = connection_style
+        self._activation = activation
 
         self._qkv_linear = tc.nn.Linear(
             in_features=self._input_dim,
@@ -93,15 +108,19 @@ class MultiheadSelfAttention(tc.nn.Module):
         attn_output = masked_self_attention(qs, ks, vs)
         attn_output = tc.cat(tc.chunk(attn_output, self._num_heads, dim=0), dim=-1)
 
+        if self._connection_style == 'residual':
+            attn_output = self._proj_linear(attn_output)
+
+        if self._activation is not None:
+            attn_output = self._activation(attn_output)
+
         if self._connection_style == 'plain':
             output = attn_output
         elif self._connection_style == 'residual':
-            output = inputs + self._proj_linear(attn_output)
+            output = inputs + attn_output
         elif self._connection_style == 'dense':
             output = tc.cat((inputs, attn_output), dim=-1)
         else:
             raise NotImplementedError
 
         return output, new_kvs
-
-
