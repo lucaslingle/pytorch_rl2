@@ -32,7 +32,9 @@ class LayerNorm(tc.nn.Module):
         return scaled
 
 
-def sinusoidal_embeddings(pos_seq, inv_freq):
+def sinusoidal_embeddings(src_len, d_model):
+    pos_seq = tc.arange(src_len)[::-1]
+    inv_freq = 1 / (10000 ** (tc.arange(0, d_model, 2) / d_model))
     sinusoid_input = pos_seq.view(-1, 1) * inv_freq.view(1, -1)
     pos_emb = tc.cat((tc.sin(sinusoid_input), tc.cos(sinusoid_input)), dim=-1)
     return pos_emb
@@ -136,6 +138,12 @@ class MultiheadSelfAttention(tc.nn.Module):
                 bias=False)
             tc.nn.init.xavier_normal_(self._proj_linear.weight)
 
+    def split_heads(self, inputs):
+        return tc.cat(tc.chunk(inputs, self._num_heads, dim=-1), dim=0)
+
+    def merge_heads(self, inputs):
+        return tc.cat(tc.chunk(inputs, self._num_heads, dim=0), dim=-1)
+
     def forward(self, inputs, past_kvs=None):
         """
         Args:
@@ -145,6 +153,8 @@ class MultiheadSelfAttention(tc.nn.Module):
         Returns:
             output tensor with shape determined by self._connection_style
         """
+        assert inputs.shape[-1] == self._input_dim
+
         qkv = self._qkv_linear(inputs)
         qs, ks, vs = tc.chunk(qkv, 3, dim=-1)
 
@@ -154,30 +164,25 @@ class MultiheadSelfAttention(tc.nn.Module):
             vs = tc.cat((past_vs, vs), dim=1)
         new_kvs = tc.cat((ks, vs), dim=-1)  # [B, T1+T2, H*F*2]
 
-        qs, ks, vs = list(map(
-            lambda x: tc.cat(tc.chunk(x, self._num_heads, dim=-1), dim=0),
-            [qs, ks, vs]))
+        qs, ks, vs = list(map(self.split_heads, [qs, ks, vs]))  # [B*H, ..., F]
 
         if self._attention_style == 'rel':
-            pos_seq = tc.arange(ks.shape[1])[::-1]
-            inv_freq = 1 / (10000 ** (tc.arange(0, self._input_dim, 2) / self._input_dim))
-            r_mat = sinusoidal_embeddings(pos_seq, inv_freq)
-            rs = self._r_linear(r_mat)
+            batch_size, src_len, d_model = inputs.shape[0], ks.shape[1], inputs.shape[-1]
+            r_mat = sinusoidal_embeddings(src_len, d_model)      # [T1+T2, D]
+            rs = self._r_linear(r_mat)                           # [T1+T2, H*F]
 
-            rs = tc.tile(rs.unsqueeze(0), [inputs.shape[0], 1, 1])  # [B, T1+T2, H*F]
-            u_ = tc.tile(self._u.unsqueeze(0), [inputs.shape[0], 1])
-            v_ = tc.tile(self._v.unsqueeze(0), [inputs.shape[0], 1])
+            rs = tc.tile(rs.unsqueeze(0), [batch_size, 1, 1])    # [B, T1+T2, H*F]
+            u_ = tc.tile(self._u.unsqueeze(0), [batch_size, 1])  # [B, H*F]
+            v_ = tc.tile(self._v.unsqueeze(0), [batch_size, 1])  # [B, H*F]
 
-            rs, u_, v_ = list(map(
-                lambda x: tc.cat(tc.chunk(x, self._num_heads, dim=-1), dim=0),
-                [rs, u_, v_]))
+            rs, u_, v_ = list(map(self.split_heads, [rs, u_, v_]))  # [B*H, ..., F]
 
             attn_output = relative_masked_self_attention(
-                qs, ks, vs, rs, u_, v_)
+                qs, ks, vs, rs, u_, v_)   # [B*H, T2, F]
         else:
-            attn_output = masked_self_attention(qs, ks, vs)
+            attn_output = masked_self_attention(qs, ks, vs)   # [B*H, T2, F]
 
-        attn_output = tc.cat(tc.chunk(attn_output, self._num_heads, dim=0), dim=-1)
+        attn_output = self.merge_heads(attn_output)  # [B, T2, H*F]
 
         if self._connection_style == 'residual':
             attn_output = self._proj_linear(attn_output)
