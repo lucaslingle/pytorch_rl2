@@ -33,8 +33,7 @@ class LayerNorm(tc.nn.Module):
 
 
 def sinusoidal_embeddings(src_len, d_model):
-    # nb: for use with relative attention only
-    pos_seq = tc.arange(src_len)[::-1]
+    pos_seq = tc.arange(src_len)
     inv_freq = 1 / (10000 ** (tc.arange(0, d_model, 2) / d_model))
     sinusoid_input = pos_seq.view(-1, 1) * inv_freq.view(1, -1)
     pos_emb = tc.cat((tc.sin(sinusoid_input), tc.cos(sinusoid_input)), dim=-1)
@@ -169,8 +168,8 @@ class MultiheadSelfAttention(tc.nn.Module):
 
         if self._attention_style == 'rel':
             batch_size, src_len, d_model = inputs.shape[0], ks.shape[1], inputs.shape[-1]
-            r_mat = sinusoidal_embeddings(src_len, d_model)      # [T1+T2, I]
-            rs = self._r_linear(r_mat)                           # [T1+T2, H*F]
+            r_mat = sinusoidal_embeddings(src_len, d_model)[::-1, :]   # [T1+T2, I]
+            rs = self._r_linear(r_mat)                                 # [T1+T2, H*F]
 
             rs = tc.tile(rs.unsqueeze(0), [batch_size, 1, 1])    # [B, T1+T2, H*F]
             u_ = tc.tile(self._u.unsqueeze(0), [batch_size, 1])  # [B, H*F]
