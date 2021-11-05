@@ -161,7 +161,7 @@ class MultiheadSelfAttention(tc.nn.Module):
         if self._attention_style == 'rel':
             pos_seq = tc.arange(ks.shape[1])[::-1]
             inv_freq = 1 / (10000 ** (tc.arange(0, self._input_dim, 2) / self._input_dim))
-            r_mat = sinusoidal_embeddings(pos_seq, inv_freq).unsqueeze(0)
+            r_mat = sinusoidal_embeddings(pos_seq, inv_freq)
             rs = self._r_linear(r_mat)
 
             rs = tc.tile(rs.unsqueeze(0), [inputs.shape[0], 1, 1])   # [B, T1+T2, H*F]
