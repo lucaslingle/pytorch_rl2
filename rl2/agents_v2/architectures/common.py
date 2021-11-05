@@ -156,7 +156,7 @@ class MultiheadSelfAttention(tc.nn.Module):
 
         qs, ks, vs = list(map(
             lambda x: tc.cat(tc.chunk(x, self._num_heads, dim=-1), dim=0),
-            [qs, ks, vs]))
+            [qs, ks, vs]))  # [B*H, F]
 
         if self._attention_style == 'rel':
             pos_seq = tc.arange(ks.shape[1])[::-1]
@@ -164,9 +164,9 @@ class MultiheadSelfAttention(tc.nn.Module):
             r_mat = sinusoidal_embeddings(pos_seq, inv_freq)
             rs = self._r_linear(r_mat)
 
-            rs = tc.tile(rs.unsqueeze(0), [inputs.shape[0], 1, 1])   # [B, T1+T2, H*F]
-            u_ = tc.tile(self._u.unsqueeze(0), [inputs.shape[0], 1])
-            v_ = tc.tile(self._v.unsqueeze(0), [inputs.shape[0], 1])
+            rs = tc.tile(rs.unsqueeze(0), [inputs.shape[0], 1, 1])    # [B, T1+T2, H*F]
+            u_ = tc.tile(self._u.unsqueeze(0), [inputs.shape[0], 1])  # [B, H*F]
+            v_ = tc.tile(self._v.unsqueeze(0), [inputs.shape[0], 1])  # [B, H*F]
 
             rs, u_, v_ = list(map(
                 lambda x: tc.cat(tc.chunk(x, self._num_heads, dim=-1), dim=0),
