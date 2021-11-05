@@ -156,7 +156,7 @@ class MultiheadSelfAttention(tc.nn.Module):
 
         qs, ks, vs = list(map(
             lambda x: tc.cat(tc.chunk(x, self._num_heads, dim=-1), dim=0),
-            [qs, ks, vs]))  # [B*H, F]
+            [qs, ks, vs]))
 
         if self._attention_style == 'rel':
             pos_seq = tc.arange(ks.shape[1])[::-1]
