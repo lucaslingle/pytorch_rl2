@@ -32,6 +32,12 @@ class LayerNorm(tc.nn.Module):
         return scaled
 
 
+def sinusoidal_embeddings(pos_seq, inv_freq):
+    sinusoid_input = pos_seq.view(-1, 1) * inv_freq.view(1, -1)
+    pos_emb = tc.cat((tc.sin(sinusoid_input), tc.cos(sinusoid_input)), dim=-1)
+    return pos_emb
+
+
 def get_mask(dest_len, src_len):
     i = tc.arange(dest_len).view(dest_len, 1)
     j = tc.arange(src_len).view(1, src_len)
@@ -45,10 +51,43 @@ def masked_self_attention(q, k, v):
 
     scores = tc.bmm(q, k.permute(0, 2, 1))
     scores /= tc.sqrt(q.shape[-1])
-    scores -= 1e10 * (1. - mask)
+    scores -= 1e10 * (1 - mask)
     w = tc.nn.Softmax(dim=-1)(scores)  # [-1, T2, T1+T2]
 
     output = tc.bmm(w, v)
+    return output
+
+
+def rel_shift(inputs):
+    # inputs should be a 3d tensor with shape [B, T2, T1+T2]
+    # this function implements the part of the shift from Dai et al., Appdx B,
+    # but must be combined with subsequent causal masking to have correct effect
+    input_shape = inputs.shape
+    zp = tc.zeros(size=(input_shape[0], 1, input_shape[2]), dtype=tc.float32)
+    inputs = tc.cat((zp, inputs), dim=1)
+    inputs = tc.reshape(
+        inputs, [input_shape[0], input_shape[2]+1, input_shape[1]])
+    inputs = inputs[:, 1:, :]
+    inputs = tc.reshape(inputs, input_shape)
+    return inputs
+
+
+def relative_masked_self_attention(qs, ks, vs, rs, u_, v_):
+    mask = get_mask(dest_len=qs.shape[1], src_len=ks.shape[1])
+    mask = mask.view(1, *mask.shape)
+
+    ac_qs = qs + u_
+    bd_qs = qs + v_
+    ac = tc.bmm(ac_qs, ks.permute(0, 2, 1))
+    bd = tc.einsum(bd_qs, rs.permute(0, 2, 1))
+    bd = rel_shift(bd)
+
+    scores = ac + bd
+    scores /= tc.sqrt(qs.shape[-1])
+    scores = scores * mask - 1e10 * (1 - mask)
+    ws = tc.nn.Softmax(dim=-1)(scores)
+
+    output = tc.bmm(ws, vs)
     return output
 
 
@@ -58,14 +97,17 @@ class MultiheadSelfAttention(tc.nn.Module):
             input_dim,
             num_heads,
             num_head_features,
+            attention_style,
             connection_style,
             activation=None
     ):
+        assert attention_style in ['abs', 'rel']
         assert connection_style in ['plain', 'residual', 'dense']
         super().__init__()
         self._input_dim = input_dim
         self._num_heads = num_heads
         self._num_head_features = num_head_features
+        self._attention_style = attention_style
         self._connection_style = connection_style
         self._activation = activation
 
@@ -74,6 +116,18 @@ class MultiheadSelfAttention(tc.nn.Module):
             out_features=(self._num_heads * self._num_head_features * 3),
             bias=False)
         tc.nn.init.xavier_normal_(self._qkv_linear.weight)
+
+        if self._attention_style == 'rel':
+            self._r_linear = tc.nn.Linear(
+                in_features=self._input_dim,
+                out_features=(self._num_heads * self._num_head_features),
+                bias=False)
+            self._u = tc.nn.Parameter(
+                tc.zeros(size=(self._num_heads * self._num_head_features,),
+                         dtype=tc.float32))
+            self._v = tc.nn.Parameter(
+                tc.zeros(size=(self._num_heads * self._num_head_features,),
+                         dtype=tc.float32))
 
         if self._connection_style == 'residual':
             self._proj_linear = tc.nn.Linear(
@@ -98,14 +152,31 @@ class MultiheadSelfAttention(tc.nn.Module):
             past_ks, past_vs = tc.chunk(past_kvs, 2, dim=-1)
             ks = tc.cat((past_ks, ks), dim=1)
             vs = tc.cat((past_vs, vs), dim=1)
-
         new_kvs = tc.cat((ks, vs), dim=-1)  # [B, T1+T2, H*F*2]
 
         qs, ks, vs = list(map(
             lambda x: tc.cat(tc.chunk(x, self._num_heads, dim=-1), dim=0),
             [qs, ks, vs]))
 
-        attn_output = masked_self_attention(qs, ks, vs)
+        if self._attention_style == 'rel':
+            pos_seq = tc.arange(ks.shape[1])[::-1]
+            inv_freq = 1 / (10000 ** (tc.arange(0, self._input_dim, 2) / self._input_dim))
+            r_mat = sinusoidal_embeddings(pos_seq, inv_freq).unsqueeze(0)
+            rs = self._r_linear(r_mat)
+
+            rs = tc.tile(rs, [inputs.shape[0], 1])
+            u_ = tc.tile(self._u.unsqueeze(0), [inputs.shape[0], 1])
+            v_ = tc.tile(self._v.unsqueeze(0), [inputs.shape[0], 1])
+
+            rs, u_, v_ = list(map(
+                lambda x: tc.cat(tc.chunk(x, self._num_heads, dim=-1), dim=0),
+                [rs, u_, v_]))
+
+            attn_output = relative_masked_self_attention(
+                qs, ks, vs, rs, u_, v_)
+        else:
+            attn_output = masked_self_attention(qs, ks, vs)
+
         attn_output = tc.cat(tc.chunk(attn_output, self._num_heads, dim=0), dim=-1)
 
         if self._connection_style == 'residual':

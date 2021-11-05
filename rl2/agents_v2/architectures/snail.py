@@ -202,6 +202,7 @@ class SNAIL(tc.nn.Module):
             input_dim=self._tc2_output_dim,
             num_heads=1,
             num_head_features=self._feature_dim,
+            attention_style='absolute',
             connection_style='dense')
 
     def initial_state(self, batch_size: int) -> None:
