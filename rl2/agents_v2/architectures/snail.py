@@ -79,7 +79,7 @@ class CausalConv(tc.nn.Module):
             zp = tc.zeros(size=zps, dtype=tc.float32)
             inputs = tc.cat((zp, inputs), dim=1)
 
-        conv = self._conv(inputs)
+        conv = self._conv(inputs.permute(0, 2, 1)).permute(0, 2, 1)
         return conv
 
 
@@ -101,13 +101,13 @@ class DenseBlock(tc.nn.Module):
 
         self._conv = CausalConv(
             input_dim=self._input_dim,
-            feature_dim=2*self._feature_dim,
+            feature_dim=(2 * self._feature_dim),
             kernel_size=self._kernel_size,
             dilation_rate=self._dilation_rate,
             use_bias=(not self._use_ln))
 
         if self._use_ln:
-            self._conv_ln = LayerNorm(units=self._feature_dim)
+            self._conv_ln = LayerNorm(units=(2 * self._feature_dim))
 
     def forward(self, inputs, past_inputs=None):
         conv = self._conv(inputs=inputs, past_inputs=past_inputs)
@@ -175,17 +175,18 @@ class TCBlock(tc.nn.Module):
 
 
 class SNAIL(tc.nn.Module):
-    def __init__(self, input_dim, feature_dim, context_size):
+    def __init__(self, input_dim, feature_dim, context_size, use_ln=True):
         super().__init__()
         self._input_dim = input_dim
         self._feature_dim = feature_dim
         self._context_size = context_size
+        self._use_ln = use_ln
 
         self._tc1 = TCBlock(
             input_dim=self._input_dim,
             feature_dim=self._feature_dim,
             context_size=self._context_size,
-            use_ln=True)
+            use_ln=self._use_ln)
 
         self._tc1_output_dim = self._input_dim + \
                                self._tc1.num_layers * self._feature_dim
@@ -193,7 +194,7 @@ class SNAIL(tc.nn.Module):
             input_dim=self._tc1_output_dim,
             feature_dim=self._feature_dim,
             context_size=self._context_size,
-            use_ln=True)
+            use_ln=self._use_ln)
 
         self._tc2_output_dim = self._input_dim + \
                                self._tc1.num_layers * self._feature_dim + \
@@ -202,11 +203,15 @@ class SNAIL(tc.nn.Module):
             input_dim=self._tc2_output_dim,
             num_heads=1,
             num_head_features=self._feature_dim,
-            attention_style='absolute',
+            attention_style='abs',
             connection_style='dense')
 
     def initial_state(self, batch_size: int) -> None:
         return None
+
+    @property
+    def output_dim(self):
+        return self._tc2_output_dim + self._feature_dim
 
     def forward(
         self,
@@ -233,10 +238,14 @@ class SNAIL(tc.nn.Module):
         if prev_state is None:
             tc1_out = self._tc1(inputs=inputs, past_inputs=None)
             tc2_out = self._tc2(inputs=tc1_out, past_inputs=None)
-            attn_out, new_attn_kv = self._attn(presents=tc2_out, past_kvs=None)
+            attn_out, new_attn_kv = self._attn(inputs=tc2_out, past_kvs=None)
 
             features = attn_out
             new_state = tc.cat((tc2_out, new_attn_kv), dim=-1)
+
+            if features.shape[1] == 1:
+                features = features.squeeze(1)
+
             return features, new_state
 
         tc1_out = self._tc1(
@@ -246,11 +255,15 @@ class SNAIL(tc.nn.Module):
             inputs=tc1_out, past_inputs=prev_state[:, :, 0:self._tc2_output_dim])
 
         attn_out, new_attn_kv = self._attn(
-            presents=tc2_out, past_kvs=prev_state[:, :, self._tc2_output_dim:])
+            inputs=tc2_out, past_kvs=prev_state[:, :, self._tc2_output_dim:])
 
+        new_attn_kv = new_attn_kv[:, -tc2_out.shape[1]:, :]
         features = attn_out
         new_state = tc.cat(
             (prev_state, tc.cat((tc2_out, new_attn_kv), dim=-1)),
             dim=1)
+
+        if features.shape[1] == 1:
+            features = features.squeeze(1)
 
         return features, new_state

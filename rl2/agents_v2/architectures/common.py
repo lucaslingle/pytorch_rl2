@@ -52,7 +52,7 @@ def masked_self_attention(q, k, v):
     mask = mask.view(1, *mask.shape)
 
     scores = tc.bmm(q, k.permute(0, 2, 1))
-    scores /= tc.sqrt(q.shape[-1])
+    scores /= q.shape[-1] ** 0.5
     scores -= 1e10 * (1 - mask)
     w = tc.nn.Softmax(dim=-1)(scores)  # [-1, T2, T1+T2]
 
@@ -85,7 +85,7 @@ def relative_masked_self_attention(qs, ks, vs, rs, u_, v_):
     bd = rel_shift(bd)
 
     scores = ac + bd
-    scores /= tc.sqrt(qs.shape[-1])
+    scores /= qs.shape[-1] ** 0.5
     scores = scores * mask - 1e10 * (1 - mask)
     ws = tc.nn.Softmax(dim=-1)(scores)
 

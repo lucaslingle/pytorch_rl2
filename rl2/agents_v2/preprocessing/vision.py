@@ -13,6 +13,11 @@ class VisionNet(abc.ABC, tc.nn.Module):
     """
     Vision network abstract class.
     """
+    @property
+    @abc.abstractmethod
+    def output_dim(self) -> int:
+        pass
+
     @abc.abstractmethod
     def forward(self, curr_obs: tc.FloatTensor) -> tc.FloatTensor:
         """
@@ -32,6 +37,10 @@ class MDPPreprocessing(Preprocessing):
         super().__init__()
         self._num_actions = num_actions
         self._vision_net = vision_net
+
+    @property
+    def output_dim(self):
+        return self._vision_net.output_dim + self._num_actions + 2
 
     def forward(
         self,

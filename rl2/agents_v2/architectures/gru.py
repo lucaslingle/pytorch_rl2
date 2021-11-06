@@ -71,6 +71,10 @@ class GRU(tc.nn.Module):
         """
         return self._initial_state.unsqueeze(0).repeat(batch_size, 1)
 
+    @property
+    def output_dim(self):
+        return self._hidden_dim
+
     def forward(
         self,
         inputs: tc.FloatTensor,

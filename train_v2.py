@@ -1,6 +1,5 @@
 """
-Implements training loop for the mdp agent from Duan et al., 2016
-- 'RL^2: Fast Reinforcement Learning via Slow Reinforcement Learning'
+Script for training stateful meta-reinforcement learning agents
 """
 
 import argparse
@@ -8,9 +7,13 @@ from functools import partial
 
 import torch as tc
 
+from rl2.envs.bandit_env import BanditEnv
 from rl2.envs.mdp_env import MDPEnv
-from rl2.agents_v2.preprocessing.tabular import MDPPreprocessing
+
+from rl2.agents_v2.preprocessing.tabular import MABPreprocessing, MDPPreprocessing
 from rl2.agents_v2.architectures.gru import GRU
+from rl2.agents_v2.architectures.snail import SNAIL
+# from rl2.agents_v2.architectures.transformer import TrXLI
 from rl2.agents_v2.heads.policy_heads import LinearPolicyHead
 from rl2.agents_v2.heads.value_heads import LinearValueHead
 from rl2.agents_v2.integration.policy_net import StatefulPolicyNet
@@ -25,16 +28,21 @@ from rl2.utils.optim_util import get_weight_decay_param_groups
 
 def create_argparser():
     parser = argparse.ArgumentParser(
-        description="""Training script for RL^2 MDP agent.""")
+        description="""Training script for RL^2.""")
     parser.add_argument("--max_pol_iters", type=int, default=12000)
-    parser.add_argument("--num_states", type=int, default=10)
+    parser.add_argument("--environment", choices=['bandit', 'mdp'], default='bandit')
+    parser.add_argument("--architecture", choices=['gru', 'snail'], default='snail')
+    parser.add_argument("--num_states", type=int, default=10,
+                        help="Ignored if environment is bandit.")
     parser.add_argument("--num_actions", type=int, default=5)
-    parser.add_argument("--num_features", type=int, default=256)
-    parser.add_argument("--forget_bias", type=float, default=1.0)
-    parser.add_argument("--model_name", type=str, default='defaults_v2')
+    parser.add_argument("--num_features", type=int, default=16)
+    parser.add_argument("--forget_bias", type=float, default=1.0,
+                        help="Ignored if architecture is not gru/lstm.")
+    parser.add_argument("--model_name", type=str, default='unified_v2')
     parser.add_argument("--checkpoint_dir", type=str, default='checkpoints')
     parser.add_argument("--checkpoint_interval", type=int, default=10)
-    parser.add_argument("--episode_len", type=int, default=10)
+    parser.add_argument("--episode_len", type=int, default=10,
+                        help="Ignored if environment is bandit.")
     parser.add_argument("--episodes_per_meta_episode", type=int, default=10)
     parser.add_argument("--meta_episodes_per_policy_update", type=int, default=30000//100)
     parser.add_argument("--meta_episodes_per_actor_batch", type=int, default=60)
@@ -51,45 +59,131 @@ def create_argparser():
     return parser
 
 
+def create_env(environment, num_states, num_actions, episode_len):
+    if environment == 'bandit':
+        return BanditEnv(num_actions=num_actions)
+    elif environment == 'mdp':
+        return MDPEnv(num_states=num_states,
+                      num_actions=num_actions,
+                      max_episode_length=episode_len)
+    else:
+        raise NotImplementedError
+
+
+def create_preprocessing(environment, num_states, num_actions):
+    if environment == 'bandit':
+        return MABPreprocessing(num_actions=num_actions)
+    elif environment == 'mdp':
+        return MDPPreprocessing(
+            num_states=num_states, num_actions=num_actions)
+    else:
+        raise NotImplementedError
+
+
+def create_architecture(
+        environment, architecture, input_dim, num_features,
+        forget_bias, episode_len, episodes_per_meta_episode
+):
+    episode_len = 1 if environment == 'bandit' else episode_len
+    context_size = episode_len * episodes_per_meta_episode
+
+    if architecture == 'gru':
+        return GRU(
+            input_dim=input_dim,
+            hidden_dim=num_features,
+            forget_bias=forget_bias,
+            use_ln=True,
+            reset_after=True)
+    elif architecture == 'snail':
+        return SNAIL(
+            input_dim=input_dim,
+            feature_dim=num_features,
+            context_size=context_size,
+            use_ln=True)
+    else:
+        raise NotImplementedError
+
+
+def create_head(num_features, num_actions, head_type):
+    if head_type == 'policy':
+        return LinearPolicyHead(
+            num_features=num_features,
+            num_actions=num_actions)
+    elif head_type == 'value':
+        return LinearValueHead(
+            num_features=num_features)
+    else:
+        raise NotImplementedError
+
+
+def create_net(
+        environment, architecture, num_states, num_actions, num_features,
+        forget_bias, episode_len, episodes_per_meta_episode, net_type
+):
+    preprocessing = create_preprocessing(
+        environment=environment,
+        num_states=num_states,
+        num_actions=num_actions)
+    architecture = create_architecture(
+        environment=environment,
+        architecture=architecture,
+        input_dim=preprocessing.output_dim,
+        num_features=num_features,
+        forget_bias=forget_bias,
+        episode_len=episode_len,
+        episodes_per_meta_episode=episodes_per_meta_episode)
+    head = create_head(
+        num_features=architecture.output_dim,
+        num_actions=num_actions,
+        head_type=net_type)
+
+    if net_type == 'policy':
+        return StatefulPolicyNet(
+            preprocessing=preprocessing,
+            architecture=architecture,
+            policy_head=head)
+    elif net_type == 'value':
+        return StatefulValueNet(
+            preprocessing=preprocessing,
+            architecture=architecture,
+            value_head=head)
+    else:
+        raise NotImplementedError
+
+
 def main():
     args = create_argparser().parse_args()
     comm = get_comm()
 
     # create env.
-    env = MDPEnv(
+    env = create_env(
+        environment=args.environment,
         num_states=args.num_states,
         num_actions=args.num_actions,
-        max_episode_length=args.episode_len)
+        episode_len=args.episode_len)
 
     # create learning system.
-    policy_net = StatefulPolicyNet(
-        preprocessing=MDPPreprocessing(
-            num_actions=args.num_actions,
-            num_states=args.num_states),
-        architecture=GRU(
-            input_dim=args.num_states+args.num_actions+2,
-            hidden_dim=args.num_features,
-            forget_bias=args.forget_bias,
-            use_ln=True,
-            reset_after=True),
-        policy_head=LinearPolicyHead(
-            num_actions=args.num_actions,
-            num_features=args.num_features)
-    )
+    policy_net = create_net(
+        environment=args.environment,
+        architecture=args.architecture,
+        num_states=args.num_states,
+        num_actions=args.num_actions,
+        num_features=args.num_features,
+        forget_bias=args.forget_bias,
+        episode_len=args.episode_len,
+        episodes_per_meta_episode=args.episodes_per_meta_episode,
+        net_type='policy')
 
-    value_net = StatefulValueNet(
-        preprocessing=MDPPreprocessing(
-            num_actions=args.num_actions,
-            num_states=args.num_states),
-        architecture=GRU(
-            input_dim=args.num_states+args.num_actions+2,
-            hidden_dim=args.num_features,
-            forget_bias=args.forget_bias,
-            use_ln=True,
-            reset_after=True),
-        value_head=LinearValueHead(
-            num_features=args.num_features)
-    )
+    value_net = create_net(
+        environment=args.environment,
+        architecture=args.architecture,
+        num_states=args.num_states,
+        num_actions=args.num_actions,
+        num_features=args.num_features,
+        forget_bias=args.forget_bias,
+        episode_len=args.episode_len,
+        episodes_per_meta_episode=args.episodes_per_meta_episode,
+        net_type='value')
 
     policy_optimizer = tc.optim.AdamW(
         get_weight_decay_param_groups(policy_net, args.adam_wd),
@@ -168,7 +262,7 @@ def main():
         value_optimizer=value_optimizer,
         policy_scheduler=policy_scheduler,
         value_scheduler=value_scheduler,
-        episode_len=args.episode_len,
+        episode_len=1 if args.environment == 'bandit' else args.episode_len,
         episodes_per_meta_episode=args.episodes_per_meta_episode,
         meta_episodes_per_actor_batch=args.meta_episodes_per_actor_batch,
         meta_episodes_per_policy_update=args.meta_episodes_per_policy_update,
