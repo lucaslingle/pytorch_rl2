@@ -44,7 +44,8 @@ def create_argparser():
     parser.add_argument("--episode_len", type=int, default=10,
                         help="Ignored if environment is bandit.")
     parser.add_argument("--episodes_per_meta_episode", type=int, default=10)
-    parser.add_argument("--meta_episodes_per_policy_update", type=int, default=30000//100)
+    parser.add_argument("--meta_episodes_per_policy_update", type=int, default=-1,
+                        help="If -1, quantity is determined using a formula")
     parser.add_argument("--meta_episodes_per_actor_batch", type=int, default=60)
     parser.add_argument("--ppo_opt_epochs", type=int, default=8)
     parser.add_argument("--ppo_clip_param", type=float, default=0.10)
@@ -254,6 +255,15 @@ def main():
         scheduler=value_scheduler)
 
     # run it!
+    episode_len = 1 if args.environment == 'bandit' else args.episode_len
+    if args.meta_episodes_per_policy_update == -1:
+        num_procs = comm.Get_size()
+        numer = 240000  # total number of observations per policy improvement
+        denom = num_procs * episode_len * args.episodes_per_meta_episode
+        meta_episodes_per_policy_update = numer // denom
+    else:
+        meta_episodes_per_policy_update = args.meta_episodes_per_policy_update
+
     training_loop(
         env=env,
         policy_net=policy_net,
@@ -262,10 +272,10 @@ def main():
         value_optimizer=value_optimizer,
         policy_scheduler=policy_scheduler,
         value_scheduler=value_scheduler,
-        episode_len=1 if args.environment == 'bandit' else args.episode_len,
+        episode_len=episode_len,
         episodes_per_meta_episode=args.episodes_per_meta_episode,
         meta_episodes_per_actor_batch=args.meta_episodes_per_actor_batch,
-        meta_episodes_per_policy_update=args.meta_episodes_per_policy_update,
+        meta_episodes_per_policy_update=meta_episodes_per_policy_update,
         ppo_opt_epochs=args.ppo_opt_epochs,
         ppo_clip_param=args.ppo_clip_param,
         ppo_ent_coef=args.ppo_ent_coef,
