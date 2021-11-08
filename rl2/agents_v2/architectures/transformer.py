@@ -111,7 +111,7 @@ class TransformerXLILayer(tc.nn.Module):
             and new_kvs tensor of shape [B, T1+T2, H*F*2]
         """
         attn_output, new_kvs = self._attn(inputs=inputs, past_kvs=past_kvs)
-        ff_output = self.ff(inputs=attn_output)
+        ff_output = self._ff(inputs=attn_output)
 
         return ff_output, new_kvs
 
