@@ -73,33 +73,38 @@ By default, checkpoints are saved to ```./checkpoints/defaults```. To pick a dif
 you can set the ```--checkpoint_dir``` flag, and to pick a different checkpoint name, you can set the 
 ```--model_name``` flag.
 
-## Reproducing the Paper
+## Reproducing the Papers
+
+We reproduced or beat the performance of RL^2 GRU (Duan et al., 2016) and RL^2 SNAIL (Mishra et al., 2017) in every setting we tested. 
+
+In the figures below, ```n``` is the number of meta-episodes, and ```k``` is the number of actions. 
+Following Duan et al., 2016 and Mishra et al., 2017, in our tabular MDP experiments, all MDPs have 10 states and 5 actions, and the episode length is 10.  
 
 ### Bandit case:
 
-| Setup      | Random | Gittins |    TS |   OTS |  UCB1 | eps-Greedy | Greedy | RL^2 (paper) | RL^2 (ours) |
-| ---------- | ------ | ------- | ----- | ----- | ----- | ---------- | ------ | ------------ | ----------- | 
-|  n=10,k=5  |    5.0 |     6.6 |   5.7 |   6.5 |   6.7 |        6.6 |    6.6 |          6.7 |         6.7 |
-|  n=10,k=10 |    5.0 |     6.6 |   5.5 |   6.2 |   6.7 |        6.6 |    6.6 |          6.7 |             |
-|  n=10,k=50 |    5.1 |     6.5 |   5.2 |   5.5 |   6.6 |        6.5 |    6.5 |          6.8 |             |
-| n=100,k=5  |   49.9 |    78.3 |  74.7 |  77.9 |  78.0 |       75.4 |   74.8 |         78.7 |        78.7 |
-| n=100,k=10 |   49.9 |    82.8 |  76.7 |  81.4 |  82.4 |       77.4 |   77.1 |         83.5 |             |
-| n=100,k=50 |   49.8 |    85.2 |  64.5 |  67.7 |  84.3 |       78.3 |   78.0 |         84.9 |             |
-| n=500,k=5  |  249.8 |   405.8 | 402.0 | 406.7 | 405.8 |      388.2 |  380.6 |        401.6 |             |
-| n=500,k=10 |  249.0 |   437.8 | 429.5 | 438.9 | 437.1 |      408.0 |  395.0 |        432.5 |             |
-| n=500,k=50 |  249.6 |   463.7 | 427.2 | 437.6 | 457.6 |      413.6 |  402.8 |        438.9 |             |
+| Setup      | Random | Gittins |    TS |   OTS |  UCB1 | eps-Greedy | Greedy | RL^2 GRU (paper) | RL^2 GRU (ours) | RL^2 SNAIL (paper) | RL^2 SNAIL (ours)  |
+| ---------- | ------ | ------- | ----- | ----- | ----- | ---------- | ------ | ---------------- | --------------- | ------------------ | ------------------ |
+|  n=10,k=5  |    5.0 |     6.6 |   5.7 |   6.5 |   6.7 |        6.6 |    6.6 |              6.7 |            6.7  |                6.6 |                6.8 |
+|  n=10,k=10 |    5.0 |     6.6 |   5.5 |   6.2 |   6.7 |        6.6 |    6.6 |              6.7 |                 |                6.7 |                    | 
+|  n=10,k=50 |    5.1 |     6.5 |   5.2 |   5.5 |   6.6 |        6.5 |    6.5 |              6.8 |                 |                6.7 |                    | 
+| n=100,k=5  |   49.9 |    78.3 |  74.7 |  77.9 |  78.0 |       75.4 |   74.8 |             78.7 |            78.7 |               79.1 |                    |
+| n=100,k=10 |   49.9 |    82.8 |  76.7 |  81.4 |  82.4 |       77.4 |   77.1 |             83.5 |                 |               83.5 |                    |
+| n=100,k=50 |   49.8 |    85.2 |  64.5 |  67.7 |  84.3 |       78.3 |   78.0 |             84.9 |                 |               85.1 |                    |
+| n=500,k=5  |  249.8 |   405.8 | 402.0 | 406.7 | 405.8 |      388.2 |  380.6 |            401.6 |                 |              408.1 |                    |
+| n=500,k=10 |  249.0 |   437.8 | 429.5 | 438.9 | 437.1 |      408.0 |  395.0 |            432.5 |                 |              432.4 |                    |
+| n=500,k=50 |  249.6 |   463.7 | 427.2 | 437.6 | 457.6 |      413.6 |  402.8 |            438.9 |                 |              442.6 |                    |
 
 ### MDP case:
 
-| Setup      | Random |   PSRL |  OPSRL |  UCRL2 |    BEB | eps-Greedy | Greedy | RL^2 (paper) | RL^2 (ours) |
-| ---------- | ------ | ------ | ------ | ------ | ------ | ---------- | ------ | ------------ | ----------- |
-| n=10       |  100.1 |  138.1 |  144.1 |  146.6 |  150.2 |      132.8 |  134.8 |        156.2 |       156.4 |
-| n=25       |  250.2 |  408.8 |  425.2 |  424.1 |  427.8 |      377.3 |  368.8 |        445.7 |             |
-| n=50       |  499.7 |  904.4 |  930.7 |  918.9 |  917.8 |      823.3 |  769.3 |        936.1 |             |
-| n=75       |  749.9 | 1417.1 | 1449.2 | 1427.6 | 1422.6 |     1293.9 | 1172.9 |       1428.8 |             |
-| n=100      |  999.4 | 1939.5 | 1973.9 | 1942.1 | 1935.1 |     1778.2 | 1578.5 |       1913.7 |             |
+| Setup      | Random |   PSRL |  OPSRL |  UCRL2 |    BEB | eps-Greedy | Greedy | RL^2 GRU (paper) | RL^2 GRU (ours) | RL^2 SNAIL (paper) | RL^2 SNAIL (ours)  |
+| ---------- | ------ | ------ | ------ | ------ | ------ | ---------- | ------ | ---------------- | --------------- | ------------------ | ------------------ |
+| n=10       |  100.1 |  138.1 |  144.1 |  146.6 |  150.2 |      132.8 |  134.8 |            156.2 |           157.3 |              159.1 |                    |
+| n=25       |  250.2 |  408.8 |  425.2 |  424.1 |  427.8 |      377.3 |  368.8 |            445.7 |                 |              447.2 |                    |
+| n=50       |  499.7 |  904.4 |  930.7 |  918.9 |  917.8 |      823.3 |  769.3 |            936.1 |                 |              942.3 |                    |
+| n=75       |  749.9 | 1417.1 | 1449.2 | 1427.6 | 1422.6 |     1293.9 | 1172.9 |           1428.8 |                 |             1447.5 |                    |
+| n=100      |  999.4 | 1939.5 | 1973.9 | 1942.1 | 1935.1 |     1778.2 | 1578.5 |           1913.7 |                 |             1953.1 |                    |
 
-To perform policy optimization, we used PPO. We used layer norm instead of weight norm, and we report peak performance over training.
+To perform policy optimization, we used PPO. We used layer norm instead of weight norm, and we report peak performance over training. Our performance statistics are averaged over 1000 meta-episodes.
 
-In all cases, we used a configuration where the total number of observations per policy improvement phase was equal to 240,000. 
+In all cases, for training we used a configuration where the total number of observations per policy improvement phase was equal to 240,000. This is comparable to the 250,000 used in prior works.
 The per-process batch size was 60 trajectories. There were 8 processes. There were 8 PPO optimization epochs per policy improvement phase. 
