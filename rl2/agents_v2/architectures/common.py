@@ -101,7 +101,8 @@ class MultiheadSelfAttention(tc.nn.Module):
             num_head_features,
             attention_style,
             connection_style,
-            activation=None
+            activation=None,
+            use_ln=True
     ):
         assert attention_style in ['abs', 'rel']
         assert connection_style in ['plain', 'residual', 'dense']
@@ -112,6 +113,7 @@ class MultiheadSelfAttention(tc.nn.Module):
         self._attention_style = attention_style
         self._connection_style = connection_style
         self._activation = activation
+        self._use_ln = use_ln
 
         self._qkv_linear = tc.nn.Linear(
             in_features=self._input_dim,
@@ -152,6 +154,7 @@ class MultiheadSelfAttention(tc.nn.Module):
 
         Returns:
             output tensor with shape determined by self._connection_style
+            and new_kvs tensor of shape [B, T1+T2, H*F*2]
         """
         assert inputs.shape[-1] == self._input_dim
 

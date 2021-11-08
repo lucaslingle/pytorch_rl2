@@ -13,7 +13,7 @@ from rl2.envs.mdp_env import MDPEnv
 from rl2.agents_v2.preprocessing.tabular import MABPreprocessing, MDPPreprocessing
 from rl2.agents_v2.architectures.gru import GRU
 from rl2.agents_v2.architectures.snail import SNAIL
-# from rl2.agents_v2.architectures.transformer import TrXLI
+from rl2.agents_v2.architectures.transformer import TrXLI
 from rl2.agents_v2.heads.policy_heads import LinearPolicyHead
 from rl2.agents_v2.heads.value_heads import LinearValueHead
 from rl2.agents_v2.integration.policy_net import StatefulPolicyNet
@@ -30,12 +30,14 @@ def create_argparser():
     parser = argparse.ArgumentParser(
         description="""Training script for RL^2.""")
     parser.add_argument("--max_pol_iters", type=int, default=12000)
-    parser.add_argument("--environment", choices=['bandit', 'mdp'], default='bandit')
-    parser.add_argument("--architecture", choices=['gru', 'snail'], default='snail')
+    parser.add_argument("--environment", choices=['bandit', 'mdp'],
+                        default='bandit')
+    parser.add_argument("--architecture", choices=['gru', 'snail', 'trxli'],
+                        default='gru')
     parser.add_argument("--num_states", type=int, default=10,
                         help="Ignored if environment is bandit.")
     parser.add_argument("--num_actions", type=int, default=5)
-    parser.add_argument("--num_features", type=int, default=16)
+    parser.add_argument("--num_features", type=int, default=256)
     parser.add_argument("--forget_bias", type=float, default=1.0,
                         help="Ignored if architecture is not gru/lstm.")
     parser.add_argument("--model_name", type=str, default='unified_v2')
@@ -101,6 +103,13 @@ def create_architecture(
             feature_dim=num_features,
             context_size=context_size,
             use_ln=True)
+    elif architecture == 'trxli':
+        return TrXLI(
+            input_dim=input_dim,
+            n_layer=12,
+            n_head=8,
+            d_model=num_features,
+            d_head=(num_features // 4))
     else:
         raise NotImplementedError
 
