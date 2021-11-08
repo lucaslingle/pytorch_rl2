@@ -30,8 +30,7 @@ def create_argparser():
     parser = argparse.ArgumentParser(
         description="""Training script for RL^2.""")
     parser.add_argument("--max_pol_iters", type=int, default=12000)
-    parser.add_argument("--environment", choices=['bandit', 'mdp'],
-                        default='bandit')
+    parser.add_argument("--environment", choices=['bandit', 'mdp'], default='bandit')
     parser.add_argument("--num_states", type=int, default=10,
                         help="Ignored if environment is bandit.")
     parser.add_argument("--num_actions", type=int, default=5)
