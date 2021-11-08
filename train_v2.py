@@ -50,6 +50,7 @@ def create_argparser():
     parser.add_argument("--checkpoint_interval", type=int, default=10)
 
     ### Training
+    parser.add_argument("--max_pol_iters", type=int, default=12000)
     parser.add_argument("--episode_len", type=int, default=10,
                         help="Ignored if environment is bandit.")
     parser.add_argument("--episodes_per_meta_episode", type=int, default=10)
