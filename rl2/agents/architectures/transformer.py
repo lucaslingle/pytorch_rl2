@@ -144,6 +144,9 @@ class TrXLI(tc.nn.Module):
     def output_dim(self):
         return self._d_model
 
+    def initial_state(self, batch_size):
+        return None
+
     def forward(self, inputs, past_kvs=None):
         """
         Args:
