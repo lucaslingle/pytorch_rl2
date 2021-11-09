@@ -1,30 +1,17 @@
-# pytorch_rl2_mdp_lstm
+# RL^2: Fast Reinforcement Learning via Slow Reinforcement Learning
 
-Implementation of Duan et al., 2016 - RL^2: Fast Reinforcement via Slow Reinforcement Learning [[1]](https://arxiv.org/abs/1611.02779).
+This repo contains implementations of the algorithms, architectures, and environments from Duan et al., 2016 - ['RL^2: Fast Reinforcement Learning via Slow Reinforcement Learning'](https://arxiv.org/pdf/1611.02779.pdf), and Mishra et al., 2017 - ['A Simple Neural Attentive Meta-Learner'](https://arxiv.org/pdf/1707.03141.pdf).
 
-Previously, we implemented RL^2 for multi-armed bandit problems. This implementation focuses on tabular MDPs. 
-A more general implementation may follow. 
+It has also recently been redesigned to facilitate rapid prototyping of new stateful architectures for memory-based meta-reinforcement learning agents.   
 
 ## Background
 
-The main idea of RL^2 and the related approach by Wang et al., 2016 [[2]](https://arxiv.org/abs/1611.05763),
-is as follows: 
+The main idea of RL^2 is that a reinforcement learning agent with memory can be trained on a distribution of environments, 
+and can thereby learn an algorithm to effectively transition from exploring these environments to exploiting them.
 
-A stateful reinforcement learning agent can be trained on a distribution of environments, using standard reinforcement learning algorithms, 
-so that at every state they are encouraged to maximize the expected cumulative discounted reward [[3]](https://www.cis.upenn.edu/~mkearns/finread/BaxterBartlett.pdf#page=6).
+In fact, the RL^2 training curriculum effectively trains an agent to behave as if it possesses a probabilistic model of the possible environments it is acting in. 
 
-This stateful agent can be provided its previous action and the resulting immediate reward from that action.  
-The agent's hidden state is believed to approximate sufficient statistics for the belief of which MDP the agent is in [[4]](https://arxiv.org/abs/1905.03030).
-This hidden state guides the agent's learning and behavior in the new environment. 
-
-In practice, maximizing this objective tends to lead to policies that can explore a new environment to learn relevant information to obtain more reward.
-Intuitively, there may be some exploratory actions that tend to lead the agent to information states from which it can better exploit the environment. 
-If in expectation the immediate reward plus the next information state has higher value than the previous information state, and if the parametrized value function equals the true value function, 
-then the expectation the advantage of the action is positive, so an increase in the probability of the exploratory action under the policy is encouraged by the training process. 
-
-Through such exploration, the agent can acquire the relevant information and transition from a highly exploratory policy to a highly exploitative policy purely through changes in its hidden state.
-
-After training, this means the agent can actively attempt to learn how to solve a given task even when the optimizer is turned off. 
+This theoretical background of RL^2 is discussed by Ortega et al., 2019 and a concise treatment can be found in [my blog post](https://lucaslingle.wordpress.com/2021/10/07/on-memory-based-meta-reinforcement-learning/).   
 
 ## Getting Started
 
@@ -75,9 +62,9 @@ you can set the ```--checkpoint_dir``` flag, and to pick a different checkpoint 
 
 ## Reproducing the Papers
 
-Our implementation matched or exceeded the published performance of RL^2 GRU (Duan et al., 2016) and RL^2 SNAIL (Mishra et al., 2017) in every setting we tested.
+Our implementations matched or exceeded the published performance of RL^2 GRU (Duan et al., 2016) and RL^2 SNAIL (Mishra et al., 2017) in every setting we tested.
 
-In the figures below, ```n``` is the number of meta-episodes, and ```k``` is the number of actions. 
+In the tables below, ```n``` is the number of meta-episodes, and ```k``` is the number of actions. 
 Following Duan et al., 2016 and Mishra et al., 2017, in our tabular MDP experiments, all MDPs have 10 states and 5 actions, and the episode length is 10.  
 
 ### Bandit case:
