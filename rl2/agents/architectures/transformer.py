@@ -27,6 +27,7 @@ class FF(tc.nn.Module):
         self._output_dim = output_dim
         self._hidden_activation = hidden_activation
         self._output_activation = output_activation
+        self._connection_style = connection_style
         self._use_ln = use_ln
 
         if self._use_ln:

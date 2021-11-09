@@ -126,6 +126,7 @@ class MultiheadSelfAttention(tc.nn.Module):
                 in_features=self._input_dim,
                 out_features=(self._num_heads * self._num_head_features),
                 bias=False)
+            tc.nn.init.xavier_normal_(self._r_linear.weight)
             self._u = tc.nn.Parameter(
                 tc.zeros(size=(self._num_heads * self._num_head_features,),
                          dtype=tc.float32))
@@ -171,7 +172,8 @@ class MultiheadSelfAttention(tc.nn.Module):
 
         if self._attention_style == 'rel':
             batch_size, src_len, d_model = inputs.shape[0], ks.shape[1], inputs.shape[-1]
-            r_mat = sinusoidal_embeddings(src_len, d_model)[::-1, :]   # [T1+T2, I]
+            r_mat = tc.flip(
+                sinusoidal_embeddings(src_len, d_model), dims=(0,))    # [T1+T2, I]
             rs = self._r_linear(r_mat)                                 # [T1+T2, H*F]
 
             rs = tc.tile(rs.unsqueeze(0), [batch_size, 1, 1])    # [B, T1+T2, H*F]
