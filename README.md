@@ -75,7 +75,7 @@ you can set the ```--checkpoint_dir``` flag, and to pick a different checkpoint 
 
 ## Reproducing the Papers
 
-Our implementation matched or exceeded the published performance of RL^2 GRU (Duan et al., 2016) and RL^2 SNAIL (Mishra et al., 2017) in every setting we tested. 
+We consistently matched or exceeded the published performance of RL^2 GRU (Duan et al., 2016) and RL^2 SNAIL (Mishra et al., 2017) in every setting we tested. 
 
 In the figures below, ```n``` is the number of meta-episodes, and ```k``` is the number of actions. 
 Following Duan et al., 2016 and Mishra et al., 2017, in our tabular MDP experiments, all MDPs have 10 states and 5 actions, and the episode length is 10.  
