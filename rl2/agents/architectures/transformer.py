@@ -147,11 +147,11 @@ class TrXLI(tc.nn.Module):
     def initial_state(self, batch_size):
         return None
 
-    def forward(self, inputs, past_kvs=None):
+    def forward(self, inputs, prev_state=None):
         """
         Args:
             inputs: input vec tensor of shape [B, ..., I]
-            past_kvs: optional past kvs tensor of shape [L, B, T1, H*F*2]
+            prev_state: optional past kvs tensor of shape [L, B, T1, H*F*2]
 
          Notes:
             '...' must be either one dimensional or must not exist
@@ -164,7 +164,7 @@ class TrXLI(tc.nn.Module):
         if len(list(inputs.shape)) == 2:
             inputs = inputs.unsqueeze(1)
 
-        past_kvs = [None] * self._n_layer if past_kvs is None else past_kvs
+        past_kvs = [None] * self._n_layer if prev_state is None else prev_state
 
         inputs = self._lin(inputs)
         new_kvs_by_layer = []
