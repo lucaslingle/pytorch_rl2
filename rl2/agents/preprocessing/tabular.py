@@ -4,7 +4,7 @@ Implements preprocessing for tabular MABs and MDPs.
 
 import torch as tc
 
-from rl2.agents_v2.preprocessing.common import one_hot, Preprocessing
+from rl2.agents.preprocessing.common import one_hot, Preprocessing
 
 
 class MABPreprocessing(Preprocessing):

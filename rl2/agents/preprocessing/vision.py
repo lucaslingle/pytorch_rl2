@@ -6,7 +6,7 @@ import abc
 
 import torch as tc
 
-from rl2.agents_v2.preprocessing.common import one_hot, Preprocessing
+from rl2.agents.preprocessing.common import one_hot, Preprocessing
 
 
 class VisionNet(abc.ABC, tc.nn.Module):

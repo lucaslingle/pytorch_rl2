@@ -4,7 +4,7 @@ Implements Transformer architectures for RL^2.
 
 import torch as tc
 
-from rl2.agents_v2.architectures.common import LayerNorm, MultiheadSelfAttention
+from rl2.agents.architectures.common import LayerNorm, MultiheadSelfAttention
 
 
 class FF(tc.nn.Module):

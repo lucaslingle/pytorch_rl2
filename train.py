@@ -10,15 +10,15 @@ import torch as tc
 from rl2.envs.bandit_env import BanditEnv
 from rl2.envs.mdp_env import MDPEnv
 
-from rl2.agents_v2.preprocessing.tabular import MABPreprocessing, MDPPreprocessing
-from rl2.agents_v2.architectures.gru import GRU
-from rl2.agents_v2.architectures.snail import SNAIL
-from rl2.agents_v2.architectures.transformer import TrXLI
-from rl2.agents_v2.heads.policy_heads import LinearPolicyHead
-from rl2.agents_v2.heads.value_heads import LinearValueHead
-from rl2.agents_v2.integration.policy_net import StatefulPolicyNet
-from rl2.agents_v2.integration.value_net import StatefulValueNet
-from rl2.algos_v2.ppo import training_loop
+from rl2.agents.preprocessing.tabular import MABPreprocessing, MDPPreprocessing
+from rl2.agents.architectures.gru import GRU
+from rl2.agents.architectures.snail import SNAIL
+from rl2.agents.architectures.transformer import TrXLI
+from rl2.agents.heads.policy_heads import LinearPolicyHead
+from rl2.agents.heads.value_heads import LinearValueHead
+from rl2.agents.integration.policy_net import StatefulPolicyNet
+from rl2.agents.integration.value_net import StatefulValueNet
+from rl2.algos.ppo import training_loop
 
 from rl2.utils.checkpoint_util import maybe_load_checkpoint, save_checkpoint
 from rl2.utils.comm_util import get_comm, sync_state
