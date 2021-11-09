@@ -45,7 +45,7 @@ def create_argparser():
                         help="Ignored if architecture is not gru/lstm.")
 
     ### Checkpointing
-    parser.add_argument("--model_name", type=str, default='unified_v2')
+    parser.add_argument("--model_name", type=str, default='defaults')
     parser.add_argument("--checkpoint_dir", type=str, default='checkpoints')
     parser.add_argument("--checkpoint_interval", type=int, default=10)
 

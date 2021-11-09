@@ -50,9 +50,9 @@ To train the default settings, you can simply type:
 mpirun -np 8 python -m train
 ```
 
-This will launch 8 parallel processes, each running the ```train.py``` script. These processes will progress through several meta-episodes from distinct environments, sampled from the specified environment distribution. This computation will be carried out in parallel. We communicate gradient information and synchronize parameters using [OpenMPI](https://www.open-mpi.org/).
+This will launch 8 parallel processes, each running the ```train.py``` script. These processes each generate meta-episodes separately and then synchronously train on the collected experience in a data-parallel manner, with gradient information and model parameters synchronized across processes using mpi4py.
 
-To see additional configuration options, you can simply type ```python train.py --help```.
+To see additional configuration options, you can simply type ```python train.py --help```. Among other options, we support various architectures: GRU, LSTM, SNAIL, and TrXL-I.
 
 ### Checkpoints
 By default, checkpoints are saved to ```./checkpoints/defaults```. To pick a different checkpoint directory during training, 
