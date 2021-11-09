@@ -140,6 +140,10 @@ class TrXLI(tc.nn.Module):
             for _ in range(0, self._n_layer)
         ])
 
+    @property
+    def output_dim(self):
+        return self._d_model
+
     def forward(self, inputs, past_kvs=None):
         """
         Args:
