@@ -191,7 +191,7 @@ class TrXLI(tc.nn.Module):
 class SparseTransformerXLLayer(tc.nn.Module):
     """
     Implements one layer of a Sparse Transformer (Child et al., 2019) variant,
-    using the attention operations introduced by Dhariwal et al., 2019,
+    using the attention operations introduced by Dhariwal et al., 2020,
     and the relative position encoding from Dai et al., 2019.
     """
     def __init__(self, d_model, n_head, d_head, n_context):
@@ -258,7 +258,7 @@ class SparseTransformerXLLayer(tc.nn.Module):
 class SparseTransformerXL(tc.nn.Module):
     """
     Implements a Sparse Transformer (Child et al., 2019) variant,
-    using the attention operations introduced by Dhariwal et al., 2019,
+    using the attention operations introduced by Dhariwal et al., 2020,
     and the relative position encoding from Dai et al., 2019.
     """
     def __init__(self, input_dim, n_layer, n_head, d_model, d_head, n_context):
