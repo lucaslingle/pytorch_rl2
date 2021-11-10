@@ -203,8 +203,8 @@ class MultiheadSelfAttention(tc.nn.Module):
             #
             #   I think nothing, because P2+T2 is always less than or equal to P1+T1+T2, so ((P1+T1+T2) // R) > ((P2+T2) // R).
             #   Currently the mask for the ((P2+T2) // R) query entries is exactly the same as in classical attention,
-            #   and since the postfix entries of q, k, v from T2 are still aligned,
-            #   queries from the original T2 entries are prevented from attending to future indices.
+            #   and since the T2 // R queries are still aligned as the final elements in the time axis of q, k, v, (no wrapping to next batch row!)
+            #   queries from the original T2 // R entries are prevented from attending to future indices.
             #
             qs = tc.reshape(qs, [qs.shape[0], qs.shape[1] // self._row_len, self._row_len, qs.shape[2]])
             ks = tc.reshape(ks, [ks.shape[0], ks.shape[1] // self._row_len, self._row_len, ks.shape[2]])
