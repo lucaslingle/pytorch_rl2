@@ -183,9 +183,9 @@ class MultiheadSelfAttention(tc.nn.Module):
                 (tc.cat((zpv, vs[:, :-1, :, :]), dim=1), vs),
                 dim=2)
 
-            qs = tc.reshape(qs, [-1, self._row_len, qs.shape[-1]])
-            ks = tc.reshape(ks, [-1, 2 * self._row_len, ks.shape[-1]])
-            vs = tc.reshape(vs, [-1, 2 * self._row_len, vs.shape[-1]])
+            qs = tc.reshape(qs, [-1, self._row_len, qs.shape[-1]])      # [B', R, H*F]
+            ks = tc.reshape(ks, [-1, 2 * self._row_len, ks.shape[-1]])  # [B', 2*R, H*F]
+            vs = tc.reshape(vs, [-1, 2 * self._row_len, vs.shape[-1]])  # [B', 2*R, H*F]
 
             return qs, ks, vs, qs.shape[0]
 
@@ -201,9 +201,9 @@ class MultiheadSelfAttention(tc.nn.Module):
             ks = ks.permute(0, 2, 1, 3)
             vs = vs.permute(0, 2, 1, 3)
 
-            qs = tc.reshape(qs, [-1, qs.shape[1] // self._row_len, qs.shape[-1]])
-            ks = tc.reshape(ks, [-1, ks.shape[1] // self._row_len, ks.shape[-1]])
-            vs = tc.reshape(vs, [-1, vs.shape[1] // self._row_len, vs.shape[-1]])
+            qs = tc.reshape(qs, [-1, qs.shape[2], qs.shape[3]])  # [B', (P2+T2) // R,    H*F]
+            ks = tc.reshape(ks, [-1, ks.shape[2], ks.shape[3]])  # [B', (P1+T1+T2) // R, H*F]
+            vs = tc.reshape(vs, [-1, vs.shape[2], vs.shape[3]])  # [B', (P1+T1+T2) // R, H*F]
 
             return qs, ks, vs, qs.shape[0]
 
