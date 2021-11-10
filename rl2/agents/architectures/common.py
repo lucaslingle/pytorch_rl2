@@ -167,6 +167,9 @@ class MultiheadSelfAttention(tc.nn.Module):
             vs = tc.cat((zpv, vs), dim=1)
 
         if self._attention_style == 'locally_banded_dense':
+            ks = ks[:, -qs.shape[1]:, :]
+            vs = vs[:, -qs.shape[1]:, :]
+
             qs = tc.reshape(qs, [qs.shape[0], qs.shape[1] // self._row_len, self._row_len, qs.shape[2]])
             ks = tc.reshape(ks, [ks.shape[0], ks.shape[1] // self._row_len, self._row_len, ks.shape[2]])
             vs = tc.reshape(vs, [vs.shape[0], vs.shape[1] // self._row_len, self._row_len, vs.shape[2]])
@@ -187,6 +190,7 @@ class MultiheadSelfAttention(tc.nn.Module):
             return qs, ks, vs
 
         if self._attention_style == 'strided_sparse':
+
             qs = tc.reshape(qs, [qs.shape[0], qs.shape[1] // self._row_len, self._row_len, qs.shape[2]])
             ks = tc.reshape(ks, [ks.shape[0], ks.shape[1] // self._row_len, self._row_len, ks.shape[2]])
             vs = tc.reshape(vs, [vs.shape[0], vs.shape[1] // self._row_len, self._row_len, vs.shape[2]])
