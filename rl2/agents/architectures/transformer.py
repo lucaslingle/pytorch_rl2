@@ -186,3 +186,144 @@ class TrXLI(tc.nn.Module):
             features = features.squeeze(1)
 
         return features, new_kvs
+
+
+class SparseTransformerXLLayer(tc.nn.Module):
+    """
+    Implements one layer of a Sparse Transformer (Child et al., 2019) variant,
+    using the attention operations introduced by Dhariwal et al., 2019,
+    and the relative position encoding from Dai et al., 2019.
+    """
+    def __init__(self, d_model, n_head, d_head, n_context):
+        super().__init__()
+        self._d_model = d_model
+        self._n_head = n_head
+        self._d_head = d_head
+        self._n_context = n_context
+
+        self._attn1 = MultiheadSelfAttention(
+            input_dim=self._d_model,
+            num_heads=self._n_head,
+            num_head_features=self._d_head,
+            position_encoding_style='rel',
+            attention_style='locally_banded_dense',
+            connection_style='residual',
+            activation=None,
+            use_ln=True,
+            row_len=int(n_context ** 0.5))
+
+        self._attn2 = MultiheadSelfAttention(
+            input_dim=self._d_model,
+            num_heads=self._n_head,
+            num_head_features=self._d_head,
+            position_encoding_style='rel',
+            attention_style='strided_sparse',
+            connection_style='residual',
+            activation=None,
+            use_ln=True,
+            row_len=int(n_context ** 0.5))
+
+        self._ff = FF(
+            input_dim=self._d_model,
+            hidden_dim=(2 * self._d_model),
+            output_dim=self._d_model,
+            connection_style='residual',
+            hidden_activation=tc.nn.ReLU(),
+            output_activation=None,
+            use_ln=True)
+
+    def forward(self, inputs, past_kvs=None):
+        """
+        Args:
+            inputs: input vec tensor of shape [B, T2, I]
+            past_kvs: optional past kvs with shape [B, 2, T1, H*F*2]
+
+        Returns:
+            output tensor of shape [B, T2, I]
+            and new_kvs tensor of shape [B, 2, T1+T2, H*F*2]
+        """
+        past_kvs_for_layer_1 = None if past_kvs is None else past_kvs[:, 0]
+        attn_output_1, new_kvs_1 = self._attn1(
+            inputs=inputs, past_kvs=past_kvs_for_layer_1)
+
+        past_kvs_for_layer_2 = None if past_kvs is None else past_kvs[:, 1]
+        attn_output_2, new_kvs_2 = self._attn2(
+            inputs=attn_output_1, past_kvs=past_kvs_for_layer_2)
+
+        ff_output = self._ff(inputs=attn_output_2)
+
+        return ff_output, tc.stack([new_kvs_1, new_kvs_2], dim=1)
+
+
+class SparseTransformerXL(tc.nn.Module):
+    """
+    Implements a Sparse Transformer (Child et al., 2019) variant,
+    using the attention operations introduced by Dhariwal et al., 2019,
+    and the relative position encoding from Dai et al., 2019.
+    """
+    def __init__(self, input_dim, n_layer, n_head, d_model, d_head, n_context):
+        super().__init__()
+        self._input_dim = input_dim
+        self._n_layer = n_layer
+        self._n_head = n_head
+        self._d_model = d_model
+        self._d_head = d_head
+        self._n_context = n_context
+
+        self._lin = tc.nn.Linear(
+            self._input_dim, self._d_model, bias=False)
+        tc.nn.init.xavier_normal_(self._lin.weight)
+
+        self._transformer_layers = tc.nn.ModuleList([
+            SparseTransformerXLLayer(
+                d_model=self._d_model,
+                n_head=self._n_head,
+                d_head=self._d_head,
+                n_context=self._n_context)
+            for _ in range(0, self._n_layer)
+        ])
+
+        self._ln = LayerNorm(units=self._d_model)
+
+    @property
+    def output_dim(self):
+        return self._d_model
+
+    def initial_state(self, batch_size):
+        return None
+
+    def forward(self, inputs, prev_state=None):
+        """
+        Args:
+            inputs: input vec tensor of shape [B, ..., I]
+            prev_state: optional past kvs tensor of shape [L, B, 2, T1, H*F*2]
+
+         Notes:
+            '...' must be either one dimensional or must not exist
+
+        Returns:
+            output feature tensor of shape [B, ..., d_model]
+            and new_kvs tensor
+        """
+        assert len(list(inputs.shape)) in [2, 3]
+        if len(list(inputs.shape)) == 2:
+            inputs = inputs.unsqueeze(1)
+
+        past_kvs = [None] * self._n_layer if prev_state is None else prev_state
+
+        inputs = self._lin(inputs)
+
+        new_kvs_by_layer = []
+        for l in range(0, self._n_layer):
+            inputs, new_kvs = self._transformer_layers[l](
+                inputs=inputs, past_kvs=past_kvs[l])
+            new_kvs_by_layer.append(new_kvs)
+
+        inputs = self._ln(inputs)
+        features = tc.nn.ReLU()(inputs)
+        new_kvs = tc.stack(new_kvs_by_layer, dim=0)
+
+        if features.shape[1] == 1:
+            features = features.squeeze(1)
+
+        return features, new_kvs

@@ -13,7 +13,7 @@ from rl2.envs.mdp_env import MDPEnv
 from rl2.agents.preprocessing.tabular import MABPreprocessing, MDPPreprocessing
 from rl2.agents.architectures.gru import GRU
 from rl2.agents.architectures.snail import SNAIL
-from rl2.agents.architectures.transformer import TrXLI
+from rl2.agents.architectures.transformer import TrXLI, SparseTransformerXL
 from rl2.agents.heads.policy_heads import LinearPolicyHead
 from rl2.agents.heads.value_heads import LinearValueHead
 from rl2.agents.integration.policy_net import StatefulPolicyNet
@@ -38,8 +38,10 @@ def create_argparser():
     parser.add_argument("--num_actions", type=int, default=5)
 
     ### Architecture
-    parser.add_argument("--architecture", choices=['gru', 'snail', 'trxli'],
-                        default='gru')
+    parser.add_argument(
+        "--architecture",
+        choices=['gru', 'snail', 'trxli', 'sparse_transformer'],
+        default='gru')
     parser.add_argument("--num_features", type=int, default=256)
     parser.add_argument("--forget_bias", type=float, default=1.0,
                         help="Ignored if architecture is not gru/lstm.")
@@ -112,10 +114,18 @@ def create_architecture(
     elif architecture == 'trxli':
         return TrXLI(
             input_dim=input_dim,
-            n_layer=12,
-            n_head=8,
+            n_layer=6,
+            n_head=4,
             d_model=num_features,
             d_head=(num_features // 4))
+    elif architecture == 'sparse_transformer':
+        return SparseTransformerXL(
+            input_dim=input_dim,
+            n_layer=6,
+            n_head=4,
+            d_model=num_features,
+            d_head=(num_features // 4),
+            n_context=context_size)
     else:
         raise NotImplementedError
 
