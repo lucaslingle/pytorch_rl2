@@ -167,6 +167,13 @@ class MultiheadSelfAttention(tc.nn.Module):
             vs = tc.cat((zpv, vs), dim=1)
 
         if self._attention_style == 'locally_banded_dense':
+            # TODO(lucaslingle):
+            #   What if ks/vs is padded more or less than qs?
+            #   What happens to causality?
+            #
+            #   I think nothing, because here we truncate k and v
+            #   at the padded query length P2+T2.
+
             ks = ks[:, -qs.shape[1]:, :]
             vs = vs[:, -qs.shape[1]:, :]
 
@@ -183,9 +190,9 @@ class MultiheadSelfAttention(tc.nn.Module):
                 (tc.cat((zpv, vs[:, :-1, :, :]), dim=1), vs),
                 dim=2)
 
-            qs = tc.reshape(qs, [-1, self._row_len, qs.shape[-1]])      # [B', R, H*F]
-            ks = tc.reshape(ks, [-1, 2 * self._row_len, ks.shape[-1]])  # [B', 2*R, H*F]
-            vs = tc.reshape(vs, [-1, 2 * self._row_len, vs.shape[-1]])  # [B', 2*R, H*F]
+            qs = tc.reshape(qs, [-1, self._row_len, qs.shape[-1]])      # [B*((P2+T2) // R), R, H*F], batch idx * row idx, col idx, features
+            ks = tc.reshape(ks, [-1, 2 * self._row_len, ks.shape[-1]])  # [B*((P2+T2) // R), 2*R, H*F]
+            vs = tc.reshape(vs, [-1, 2 * self._row_len, vs.shape[-1]])  # [B*((P2+T2) // R), 2*R, H*F]
 
             return qs, ks, vs, qs.shape[0]
 
@@ -193,6 +200,12 @@ class MultiheadSelfAttention(tc.nn.Module):
             # TODO(lucaslingle):
             #   What if ks/vs is padded more or less than qs?
             #   What happens to causality?
+            #
+            #   I think nothing, because P2+T2 is always less than or equal to P1+T1+T2, so ((P1+T1+T2) // R) > ((P2+T2) // R).
+            #   Currently the mask for the ((P2+T2) // R) query entries is exactly the same as in classical attention,
+            #   and since the postfix entries of q, k, v from T2 are still aligned,
+            #   queries from the original T2 entries are prevented from attending to future indices.
+            #
             qs = tc.reshape(qs, [qs.shape[0], qs.shape[1] // self._row_len, self._row_len, qs.shape[2]])
             ks = tc.reshape(ks, [ks.shape[0], ks.shape[1] // self._row_len, self._row_len, ks.shape[2]])
             vs = tc.reshape(vs, [vs.shape[0], vs.shape[1] // self._row_len, self._row_len, vs.shape[2]])
@@ -201,9 +214,9 @@ class MultiheadSelfAttention(tc.nn.Module):
             ks = ks.permute(0, 2, 1, 3)
             vs = vs.permute(0, 2, 1, 3)
 
-            qs = tc.reshape(qs, [-1, qs.shape[2], qs.shape[3]])  # [B', (P2+T2) // R,    H*F]
-            ks = tc.reshape(ks, [-1, ks.shape[2], ks.shape[3]])  # [B', (P1+T1+T2) // R, H*F]
-            vs = tc.reshape(vs, [-1, vs.shape[2], vs.shape[3]])  # [B', (P1+T1+T2) // R, H*F]
+            qs = tc.reshape(qs, [-1, qs.shape[2], qs.shape[3]])  # [B*R, ((P2+T2) // R),    H*F], batch idx * col idx, query row idx, features
+            ks = tc.reshape(ks, [-1, ks.shape[2], ks.shape[3]])  # [B*R, ((P1+T1+T2) // R), H*F]
+            vs = tc.reshape(vs, [-1, vs.shape[2], vs.shape[3]])  # [B*R, ((P1+T1+T2) // R), H*F]
 
             return qs, ks, vs, qs.shape[0]
 
