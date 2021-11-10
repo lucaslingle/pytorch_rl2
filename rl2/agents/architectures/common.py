@@ -257,7 +257,7 @@ class MultiheadSelfAttention(tc.nn.Module):
         qs, ks, vs = list(map(self.split_heads, [qs, ks, vs]))  # [B'*H, ..., F]
 
         if self._position_encoding_style == 'rel':
-            batch_size, src_len, d_model = inputs.shape[0], ks.shape[1], inputs.shape[-1]
+            batch_size, src_len, d_model = qs.shape[0], ks.shape[1], inputs.shape[-1]
             r_mat = tc.flip(
                 sinusoidal_embeddings(src_len, d_model), dims=(0,))    # [(T1+T2)', I]
             rs = self._r_linear(r_mat)                                 # [(T1+T2)', H*F]
