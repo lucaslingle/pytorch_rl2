@@ -222,7 +222,7 @@ class MultiheadSelfAttention(tc.nn.Module):
         if self._attention_style == 'strided_sparse':
             attn_out = tc.reshape(attn_out, [-1, self._row_len, (pad_len + input_len) // self._row_len, attn_out.shape[2]])
             attn_out = attn_out.permute(0, 2, 1, 3)
-            attn_out = tc.reshape(attn_out, [-1, (pad_len + input_len), attn_out.shape[2]])
+            attn_out = tc.reshape(attn_out, [-1, (pad_len + input_len), attn_out.shape[-1]])
             attn_out = attn_out[:, pad_len:, :]
             return attn_out
 
