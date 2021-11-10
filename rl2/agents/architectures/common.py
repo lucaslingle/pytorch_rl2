@@ -150,7 +150,7 @@ class MultiheadSelfAttention(tc.nn.Module):
 
     def attn_preop(self, qs, ks, vs):
         if self._attention_style == 'full':
-            return qs, ks, vs
+            return qs, ks, vs, qs.shape[0]
 
         mod = qs.shape[1] % self._row_len
         if mod > 0:
@@ -187,7 +187,7 @@ class MultiheadSelfAttention(tc.nn.Module):
             ks = tc.reshape(ks, [-1, 2 * self._row_len, ks.shape[2]])
             vs = tc.reshape(vs, [-1, 2 * self._row_len, vs.shape[2]])
 
-            return qs, ks, vs
+            return qs, ks, vs, qs.shape[0]
 
         if self._attention_style == 'strided_sparse':
             # TODO(lucaslingle):
@@ -205,7 +205,7 @@ class MultiheadSelfAttention(tc.nn.Module):
             ks = tc.reshape(ks, [-1, ks.shape[1] // self._row_len, ks.shape[2]])
             vs = tc.reshape(vs, [-1, vs.shape[1] // self._row_len, vs.shape[2]])
 
-            return qs, ks, vs
+            return qs, ks, vs, qs.shape[0]
 
     def attn_postop(self, attn_out, input_len):
         if self._attention_style == 'full':
@@ -253,11 +253,11 @@ class MultiheadSelfAttention(tc.nn.Module):
             vs = tc.cat((past_vs, vs), dim=1)
         new_kvs = tc.cat((ks, vs), dim=-1)  # [B, T1+T2, H*F*2]
 
-        qs, ks, vs = self.attn_preop(qs, ks, vs)                # [B', ..., H*F]
+        qs, ks, vs, bsp = self.attn_preop(qs, ks, vs)           # [B', ..., H*F]
         qs, ks, vs = list(map(self.split_heads, [qs, ks, vs]))  # [B'*H, ..., F]
 
         if self._position_encoding_style == 'rel':
-            batch_size, src_len, d_model = qs.shape[0], ks.shape[1], inputs.shape[-1]
+            batch_size, src_len, d_model = bsp, ks.shape[1], inputs.shape[-1]
             r_mat = tc.flip(
                 sinusoidal_embeddings(src_len, d_model), dims=(0,))    # [(T1+T2)', I]
             rs = self._r_linear(r_mat)                                 # [(T1+T2)', H*F]
