@@ -158,15 +158,13 @@ class MultiheadSelfAttention(tc.nn.Module):
             zp = tc.zeros(size=(qs.shape[0], pad_len, qs.shape[2]))
             qs = tc.cat((zp, qs), dim=1)
 
-        if ks.shape[1] < qs.shape[1]:
-            pad_len = qs.shape[1] - ks.shape[1]
+        mod = ks.shape[1] % self._row_len
+        if mod > 0:
+            pad_len = self._row_len - mod
             zpk = tc.zeros(size=(ks.shape[0], pad_len, ks.shape[2]))
             zpv = tc.zeros(size=(vs.shape[0], pad_len, vs.shape[2]))
             ks = tc.cat((zpk, ks), dim=1)
             vs = tc.cat((zpv, vs), dim=1)
-        else:
-            ks = ks[:, -qs.shape[1]:, :]
-            vs = vs[:, -qs.shape[1]:, :]
 
         if self._attention_style == 'locally_banded_dense':
             qs = tc.reshape(qs, [qs.shape[0], qs.shape[1] // self._row_len, self._row_len, qs.shape[2]])
