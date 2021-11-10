@@ -99,21 +99,28 @@ class MultiheadSelfAttention(tc.nn.Module):
             input_dim,
             num_heads,
             num_head_features,
+            position_encoding_style,
             attention_style,
             connection_style,
             activation=None,
-            use_ln=True
+            use_ln=True,
+            row_len=None
     ):
-        assert attention_style in ['abs', 'rel']
+        assert position_encoding_style in ['abs', 'rel']
+        assert attention_style in ['full', 'locally_banded_dense', 'strided_sparse']
         assert connection_style in ['plain', 'residual', 'dense']
+        assert attention_style == 'full' or row_len is not None
+
         super().__init__()
         self._input_dim = input_dim
         self._num_heads = num_heads
         self._num_head_features = num_head_features
+        self._position_encoding_style = position_encoding_style
         self._attention_style = attention_style
         self._connection_style = connection_style
         self._activation = activation
         self._use_ln = use_ln
+        self._row_len = row_len
 
         self._qkv_linear = tc.nn.Linear(
             in_features=self._input_dim,
@@ -121,7 +128,7 @@ class MultiheadSelfAttention(tc.nn.Module):
             bias=False)
         tc.nn.init.xavier_normal_(self._qkv_linear.weight)
 
-        if self._attention_style == 'rel':
+        if self._position_encoding_style == 'rel':
             self._r_linear = tc.nn.Linear(
                 in_features=self._input_dim,
                 out_features=(self._num_heads * self._num_head_features),
@@ -140,6 +147,80 @@ class MultiheadSelfAttention(tc.nn.Module):
                 out_features=input_dim,
                 bias=False)
             tc.nn.init.xavier_normal_(self._proj_linear.weight)
+
+    def attn_preop(self, qs, ks, vs):
+        if self._attention_style == 'full':
+            return qs, ks, vs
+
+        mod = qs.shape[1] % self._row_len
+        if mod > 0:
+            pad_len = self._row_len - mod
+            zp = tc.zeros(size=(qs.shape[0], pad_len, qs.shape[2]))
+            qs = tc.cat((zp, qs), dim=1)
+
+        if ks.shape[1] < qs.shape[1]:
+            pad_len = qs.shape[1] - ks.shape[1]
+            zpk = tc.zeros(size=(ks.shape[0], pad_len, ks.shape[2]))
+            zpv = tc.zeros(size=(vs.shape[0], pad_len, vs.shape[2]))
+            ks = tc.cat((zpk, ks), dim=1)
+            vs = tc.cat((zpv, vs), dim=1)
+        else:
+            ks = ks[:, -qs.shape[1]:, :]
+            vs = vs[:, -qs.shape[1]:, :]
+
+        if self._attention_style == 'locally_banded_dense':
+            qs = tc.reshape(qs, [qs.shape[0], qs.shape[1] // self._row_len, self._row_len, qs.shape[2]])
+            ks = tc.reshape(ks, [ks.shape[0], ks.shape[1] // self._row_len, self._row_len, ks.shape[2]])
+            vs = tc.reshape(vs, [vs.shape[0], vs.shape[1] // self._row_len, self._row_len, vs.shape[2]])
+
+            zpk = tc.zeros_like(ks[:, 0:1, :, :])
+            ks = tc.cat(
+                (tc.cat((zpk, ks[:, :-1, :, :]), dim=1), ks),
+                dim=2)
+            zpv = tc.zeros_like(vs[:, 0:1, :, :])
+            vs = tc.cat(
+                (tc.cat((zpv, vs[:, :-1, :, :]), dim=1), vs),
+                dim=2)
+
+            qs = tc.reshape(qs, [-1, self._row_len, qs.shape[2]])
+            ks = tc.reshape(ks, [-1, 2 * self._row_len, ks.shape[2]])
+            vs = tc.reshape(vs, [-1, 2 * self._row_len, vs.shape[2]])
+
+            return qs, ks, vs
+
+        if self._attention_style == 'strided_sparse':
+            qs = tc.reshape(qs, [qs.shape[0], qs.shape[1] // self._row_len, self._row_len, qs.shape[2]])
+            ks = tc.reshape(ks, [ks.shape[0], ks.shape[1] // self._row_len, self._row_len, ks.shape[2]])
+            vs = tc.reshape(vs, [vs.shape[0], vs.shape[1] // self._row_len, self._row_len, vs.shape[2]])
+
+            qs = qs.permute(0, 2, 1, 3)
+            ks = ks.permute(0, 2, 1, 3)
+            vs = vs.permute(0, 2, 1, 3)
+
+            qs = tc.reshape(qs, [-1, qs.shape[1] // self._row_len, qs.shape[2]])
+            ks = tc.reshape(ks, [-1, ks.shape[1] // self._row_len, ks.shape[2]])
+            vs = tc.reshape(vs, [-1, vs.shape[1] // self._row_len, vs.shape[2]])
+
+            return qs, ks, vs
+
+    def attn_postop(self, attn_out, input_len):
+        if self._attention_style == 'full':
+            return attn_out
+
+        mod = input_len % self._row_len
+        pad_len = 0 if mod == 0 else self._row_len - mod
+
+        if self._attention_style == 'locally_banded_dense':
+            attn_out = tc.reshape(attn_out, [-1, pad_len+input_len, attn_out.shape[2]])
+            attn_out = attn_out[:, pad_len:, :]
+            return attn_out
+
+        if self._attention_style == 'strided_sparse':
+            attn_out = tc.reshape(attn_out, [-1, self._row_len, (pad_len + input_len) // self._row_len, attn_out.shape[2]])
+            attn_out = attn_out.permute(0, 2, 1, 3)
+            attn_out = tc.reshape(attn_out, [-1, (pad_len + input_len), attn_out.shape[2]])
+            attn_out = attn_out[:, pad_len:, :]
+            return attn_out
 
     def split_heads(self, inputs):
         return tc.cat(tc.chunk(inputs, self._num_heads, dim=-1), dim=0)
@@ -168,26 +249,29 @@ class MultiheadSelfAttention(tc.nn.Module):
             vs = tc.cat((past_vs, vs), dim=1)
         new_kvs = tc.cat((ks, vs), dim=-1)  # [B, T1+T2, H*F*2]
 
-        qs, ks, vs = list(map(self.split_heads, [qs, ks, vs]))  # [B*H, ..., F]
+        qs, ks, vs = self.attn_preop(qs, ks, vs)                # [B', ..., H*F]
+        qs, ks, vs = list(map(self.split_heads, [qs, ks, vs]))  # [B'*H, ..., F]
 
-        if self._attention_style == 'rel':
+        if self._position_encoding_style == 'rel':
             batch_size, src_len, d_model = inputs.shape[0], ks.shape[1], inputs.shape[-1]
             r_mat = tc.flip(
-                sinusoidal_embeddings(src_len, d_model), dims=(0,))    # [T1+T2, I]
-            rs = self._r_linear(r_mat)                                 # [T1+T2, H*F]
+                sinusoidal_embeddings(src_len, d_model), dims=(0,))    # [(T1+T2)', I]
+            rs = self._r_linear(r_mat)                                 # [(T1+T2)', H*F]
 
-            rs = tc.tile(rs.unsqueeze(0), [batch_size, 1, 1])    # [B, T1+T2, H*F]
-            u_ = tc.tile(self._u.unsqueeze(0), [batch_size, 1])  # [B, H*F]
-            v_ = tc.tile(self._v.unsqueeze(0), [batch_size, 1])  # [B, H*F]
+            rs = tc.tile(rs.unsqueeze(0), [batch_size, 1, 1])    # [B', (T1+T2)', H*F]
+            u_ = tc.tile(self._u.unsqueeze(0), [batch_size, 1])  # [B', H*F]
+            v_ = tc.tile(self._v.unsqueeze(0), [batch_size, 1])  # [B', H*F]
 
-            rs, u_, v_ = list(map(self.split_heads, [rs, u_, v_]))  # [B*H, ..., F]
+            rs, u_, v_ = list(map(self.split_heads, [rs, u_, v_]))  # [B'*H, ..., F]
 
             attn_output = relative_masked_self_attention(
-                qs, ks, vs, rs, u_, v_)   # [B*H, T2, F]
+                qs, ks, vs, rs, u_, v_)   # [B'*H, T2, F]
         else:
-            attn_output = masked_self_attention(qs, ks, vs)   # [B*H, T2, F]
+            attn_output = masked_self_attention(qs, ks, vs)   # [B'*H, T2', F]
 
-        attn_output = self.merge_heads(attn_output)  # [B, T2, H*F]
+        attn_output = self.merge_heads(attn_output)  # [B', T2', H*F]
+        attn_output = self.attn_postop(
+            attn_output, input_len=inputs.shape[1])  # [B, T2, H*F]
 
         if self._connection_style == 'residual':
             attn_output = self._proj_linear(attn_output)

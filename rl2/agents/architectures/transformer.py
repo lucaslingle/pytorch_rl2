@@ -87,7 +87,8 @@ class TransformerXLILayer(tc.nn.Module):
             input_dim=self._d_model,
             num_heads=self._n_head,
             num_head_features=self._d_head,
-            attention_style='rel',
+            position_encoding_style='rel',
+            attention_style='full',
             connection_style='residual',
             activation=tc.nn.ReLU(),
             use_ln=True)

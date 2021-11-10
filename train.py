@@ -47,7 +47,6 @@ def create_argparser():
     ### Checkpointing
     parser.add_argument("--model_name", type=str, default='defaults')
     parser.add_argument("--checkpoint_dir", type=str, default='checkpoints')
-    parser.add_argument("--checkpoint_interval", type=int, default=10)
 
     ### Training
     parser.add_argument("--max_pol_iters", type=int, default=12000)
@@ -66,7 +65,6 @@ def create_argparser():
     parser.add_argument("--adam_lr", type=float, default=2e-4)
     parser.add_argument("--adam_eps", type=float, default=1e-5)
     parser.add_argument("--adam_wd", type=float, default=0.01)
-    parser.add_argument("--experiment_seed", type=int, default=0) # not yet used
     return parser
 
 
