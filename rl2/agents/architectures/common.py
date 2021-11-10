@@ -201,7 +201,7 @@ class MultiheadSelfAttention(tc.nn.Module):
             #   What if ks/vs is padded more or less than qs?
             #   What happens to causality?
             #
-            #   I think nothing, because P2+T2 is always less than or equal to P1+T1+T2, so ((P1+T1+T2) // R) > ((P2+T2) // R).
+            #   I think nothing, because P2+T2 is always less than or equal to P1+T1+T2, so ((P1+T1+T2) // R) >= ((P2+T2) // R).
             #   Currently the mask for the ((P2+T2) // R) query entries is exactly the same as in classical attention,
             #   and since the T2 // R queries are still aligned as the final elements in the time axis of q, k, v, (no wrapping to next batch row!)
             #   queries from the original T2 // R entries are prevented from attending to future indices.
