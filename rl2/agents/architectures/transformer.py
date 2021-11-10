@@ -141,6 +141,8 @@ class TrXLI(tc.nn.Module):
             for _ in range(0, self._n_layer)
         ])
 
+        self._ln = LayerNorm(units=self._d_model)
+
     @property
     def output_dim(self):
         return self._d_model
@@ -168,13 +170,15 @@ class TrXLI(tc.nn.Module):
         past_kvs = [None] * self._n_layer if prev_state is None else prev_state
 
         inputs = self._lin(inputs)
+        inputs = tc.nn.ReLU()(inputs)
+
         new_kvs_by_layer = []
         for l in range(0, self._n_layer):
             inputs, new_kvs = self._transformer_layers[l](
                 inputs=inputs, past_kvs=past_kvs[l])
             new_kvs_by_layer.append(new_kvs)
 
-        features = inputs
+        features = self._ln(inputs)
         new_kvs = tc.stack(new_kvs_by_layer, dim=0)
 
         if features.shape[1] == 1:
