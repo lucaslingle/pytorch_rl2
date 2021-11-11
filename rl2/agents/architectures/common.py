@@ -47,13 +47,14 @@ def get_mask(dest_len, src_len):
     return m.int()
 
 
-def masked_self_attention(q, k, v):
+def masked_self_attention(q, k, v, use_mask=True):
     mask = get_mask(dest_len=q.shape[1], src_len=k.shape[1])
     mask = mask.view(1, *mask.shape)
 
     scores = tc.bmm(q, k.permute(0, 2, 1))
     scores /= q.shape[-1] ** 0.5
-    scores -= 1e10 * (1 - mask)
+    if use_mask:
+        scores = scores * mask - 1e10 * (1 - mask)
     w = tc.nn.Softmax(dim=-1)(scores)  # [-1, T2, T1+T2]
 
     output = tc.bmm(w, v)
@@ -74,7 +75,7 @@ def rel_shift(inputs):
     return inputs
 
 
-def relative_masked_self_attention(qs, ks, vs, rs, u_, v_):
+def relative_masked_self_attention(qs, ks, vs, rs, u_, v_, use_mask=True):
     mask = get_mask(dest_len=qs.shape[1], src_len=ks.shape[1])
     mask = mask.view(1, *mask.shape)
 
@@ -82,13 +83,17 @@ def relative_masked_self_attention(qs, ks, vs, rs, u_, v_):
     bd_qs = qs + v_.unsqueeze(1)
     ac = tc.bmm(ac_qs, ks.permute(0, 2, 1))
     bd = tc.bmm(bd_qs, rs.permute(0, 2, 1))
-    bd = rel_shift(bd)
 
-    scores = ac + bd
-    scores /= qs.shape[-1] ** 0.5
-    scores = scores * mask - 1e10 * (1 - mask)
+    if use_mask:
+        bd = rel_shift(bd)
+        scores = ac + bd
+        scores /= qs.shape[-1] ** 0.5
+        scores = scores * mask - 1e10 * (1 - mask)
+    else:
+        scores = ac + bd
+        scores /= qs.shape[-1] ** 0.5
+
     ws = tc.nn.Softmax(dim=-1)(scores)
-
     output = tc.bmm(ws, vs)
     return output
 
@@ -107,7 +112,7 @@ class MultiheadSelfAttention(tc.nn.Module):
             row_len=None
     ):
         assert position_encoding_style in ['abs', 'rel']
-        assert attention_style in ['full', 'locally_banded_dense', 'strided_sparse']
+        assert attention_style in ['full', 'row', 'previous_row', 'column']
         assert connection_style in ['plain', 'residual', 'dense']
         assert attention_style == 'full' or row_len is not None
 
@@ -121,6 +126,17 @@ class MultiheadSelfAttention(tc.nn.Module):
         self._activation = activation
         self._use_ln = use_ln
         self._row_len = row_len
+
+        # TODO(lucaslingle):
+        #   [Done](1) add layernorm here and in forward method,
+        #   [Done](2) convert attention names to row and column,
+        #   (3) add prev_row attention since start of each row only attends
+        #      to itself and previous start of rows,
+        #      making it only see a subset of experience
+        #   [Done](4) fix snail to use the updated constructor argument names
+
+        if self._use_ln:
+            self._ln = LayerNorm(units=self._input_dim)
 
         self._qkv_linear = tc.nn.Linear(
             in_features=self._input_dim,
@@ -152,12 +168,12 @@ class MultiheadSelfAttention(tc.nn.Module):
         if self._attention_style == 'full':
             return qs, ks, vs, qs.shape[0]
 
-        if self._attention_style == 'locally_banded_dense':
+        if self._attention_style == 'row':
             if sampling:
                 assert qs.shape[1] == 1
                 mod = ks.shape[1] % self._row_len
-                ks = ks[:, -mod:, :]  # get relevant row
-                vs = vs[:, -mod:, :]
+                ks = ks[:, -(self._row_len-mod):, :]  # get relevant row
+                vs = vs[:, -(self._row_len-mod):, :]
                 return qs, ks, vs, qs.shape[0]
             else:
                 assert qs.shape[1] == ks.shape[1] == vs.shape[1]
@@ -167,7 +183,43 @@ class MultiheadSelfAttention(tc.nn.Module):
                 vs = tc.reshape(vs, [-1, self._row_len, vs.shape[-1]])
                 return qs, ks, vs, qs.shape[0]
 
-        if self._attention_style == 'strided_sparse':
+        if self._attention_style == 'previous_row':
+            if sampling:
+                assert qs.shape[1] == 1
+                row_idx = (ks.shape[1]-1) // self._row_len
+                prev_row_flat_idx = (row_idx - 1) * self._row_len
+                if prev_row_flat_idx > 0:
+                    ks = ks[:, prev_row_flat_idx:prev_row_flat_idx+self._row_len, :]
+                    vs = vs[:, prev_row_flat_idx:prev_row_flat_idx+self._row_len, :]
+                    return qs, ks, vs, qs.shape[0]
+                else:
+                    prev_row_shape = [qs.shape[0], self._row_len, qs.shape[2]]
+                    ks = tc.zeros(size=prev_row_shape, dtype=tc.float32)
+                    vs = tc.zeros(size=prev_row_shape, dtype=tc.float32)
+                    return qs, ks, vs, qs.shape[0]
+            else:
+                assert qs.shape[1] == ks.shape[1] == vs.shape[1]
+                assert qs.shape[1] % self._row_len == 0
+
+                batch_size = qs.shape[0]
+                n_rows = qs.shape[1] // self._row_len
+                n_feature = qs.shape[2]
+                block_shape = [batch_size, n_rows, self._row_len, n_feature]
+
+                qs = tc.reshape(qs, block_shape)
+                ks = tc.reshape(ks, block_shape)
+                vs = tc.reshape(vs, block_shape)
+
+                ks = tc.nn.functional.pad(ks[:,:-1,:,:], (0,0,0,0,1,0))
+                vs = tc.nn.functional.pad(vs[:,:-1,:,:], (0,0,0,0,1,0))
+
+                qs = tc.reshape(qs, [-1, self._row_len, qs.shape[-1]])
+                ks = tc.reshape(ks, [-1, self._row_len, ks.shape[-1]])
+                vs = tc.reshape(vs, [-1, self._row_len, vs.shape[-1]])
+
+                return qs, ks, vs, qs.shape[0]
+
+        if self._attention_style == 'column':
             if sampling:
                 assert qs.shape[1] == 1
                 mod = (ks.shape[1]-1) % self._row_len
@@ -204,14 +256,21 @@ class MultiheadSelfAttention(tc.nn.Module):
         if self._attention_style == 'full':
             return attn_out
 
-        if self._attention_style == 'locally_banded_dense':
+        if self._attention_style == 'row':
             if sampling:
                 return attn_out
             else:
                 attn_out = tc.reshape(attn_out, [-1, input_len, attn_out.shape[-1]])
                 return attn_out
 
-        if self._attention_style == 'strided_sparse':
+        if self._attention_style == 'previous_row':
+            if sampling:
+                return attn_out
+            else:
+                attn_out = tc.reshape(attn_out, [-1, input_len, attn_out.shape[-1]])
+                return attn_out
+
+        if self._attention_style == 'column':
             if sampling:
                 return attn_out
             else:
@@ -242,8 +301,13 @@ class MultiheadSelfAttention(tc.nn.Module):
         """
         assert inputs.shape[-1] == self._input_dim
         sampling = (inputs.shape[1] == 1)
+        use_mask = (self._attention_style != 'previous_row')
 
-        qkv = self._qkv_linear(inputs)
+        x = inputs
+        if self._use_ln:
+            x = self._ln(inputs)
+
+        qkv = self._qkv_linear(x)
         qs, ks, vs = tc.chunk(qkv, 3, dim=-1)
 
         if past_kvs is not None:
@@ -268,9 +332,10 @@ class MultiheadSelfAttention(tc.nn.Module):
             rs, u_, v_ = list(map(self.split_heads, [rs, u_, v_]))  # [B'*H, ..., F]
 
             attn_output = relative_masked_self_attention(
-                qs, ks, vs, rs, u_, v_)   # [B'*H, T2, F]
+                qs, ks, vs, rs, u_, v_, use_mask=use_mask)   # [B'*H, T2, F]
         else:
-            attn_output = masked_self_attention(qs, ks, vs)   # [B'*H, T2', F]
+            attn_output = masked_self_attention(
+                qs, ks, vs, use_mask=use_mask)              # [B'*H, T2', F]
 
         attn_output = self.merge_heads(attn_output)  # [B', T2', H*F]
         attn_output = self.attn_postop(

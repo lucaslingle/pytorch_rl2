@@ -203,7 +203,8 @@ class SNAIL(tc.nn.Module):
             input_dim=self._tc2_output_dim,
             num_heads=1,
             num_head_features=self._feature_dim,
-            attention_style='abs',
+            position_encoding_style='abs',
+            attention_style='full',
             connection_style='dense',
             use_ln=False)
 

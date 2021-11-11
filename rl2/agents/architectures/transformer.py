@@ -202,12 +202,32 @@ class SparseTransformerXLILayer(tc.nn.Module):
         self._d_head = d_head
         self._n_context = n_context
 
+        self._attn0 = MultiheadSelfAttention(
+            input_dim=self._d_model,
+            num_heads=self._n_head,
+            num_head_features=self._d_head,
+            position_encoding_style='rel',
+            attention_style='row',
+            connection_style='residual',
+            activation=tc.nn.ReLU(),
+            use_ln=True,
+            row_len=int(n_context ** 0.5))
+
+        self._ff0 = FF(
+            input_dim=self._d_model,
+            hidden_dim=(2 * self._d_model),
+            output_dim=self._d_model,
+            connection_style='residual',
+            hidden_activation=tc.nn.ReLU(),
+            output_activation=tc.nn.ReLU(),
+            use_ln=True)
+
         self._attn1 = MultiheadSelfAttention(
             input_dim=self._d_model,
             num_heads=self._n_head,
             num_head_features=self._d_head,
             position_encoding_style='rel',
-            attention_style='locally_banded_dense',
+            attention_style='previous_row',
             connection_style='residual',
             activation=tc.nn.ReLU(),
             use_ln=True,
@@ -227,7 +247,7 @@ class SparseTransformerXLILayer(tc.nn.Module):
             num_heads=self._n_head,
             num_head_features=self._d_head,
             position_encoding_style='rel',
-            attention_style='strided_sparse',
+            attention_style='column',
             connection_style='residual',
             activation=tc.nn.ReLU(),
             use_ln=True,
@@ -246,23 +266,28 @@ class SparseTransformerXLILayer(tc.nn.Module):
         """
         Args:
             inputs: input vec tensor of shape [B, T2, I]
-            past_kvs: optional past kvs with shape [B, 2, T1, H*F*2]
+            past_kvs: optional past kvs with shape [B, 3, T1, H*F*2]
 
         Returns:
             output tensor of shape [B, T2, I]
             and new_kvs tensor of shape [B, 2, T1+T2, H*F*2]
         """
-        past_kvs_for_layer_1 = None if past_kvs is None else past_kvs[:, 0]
+        past_kvs_for_layer_0 = None if past_kvs is None else past_kvs[:, 0]
+        attn_output_0, new_kvs_0 = self._attn1(
+            inputs=inputs, past_kvs=past_kvs_for_layer_0)
+        ff_output_0 = self._ff1(attn_output_0)
+
+        past_kvs_for_layer_1 = None if past_kvs is None else past_kvs[:, 1]
         attn_output_1, new_kvs_1 = self._attn1(
-            inputs=inputs, past_kvs=past_kvs_for_layer_1)
+            inputs=ff_output_0, past_kvs=past_kvs_for_layer_1)
         ff_output_1 = self._ff1(attn_output_1)
 
-        past_kvs_for_layer_2 = None if past_kvs is None else past_kvs[:, 1]
+        past_kvs_for_layer_2 = None if past_kvs is None else past_kvs[:, 2]
         attn_output_2, new_kvs_2 = self._attn2(
             inputs=ff_output_1, past_kvs=past_kvs_for_layer_2)
         ff_output_2 = self._ff2(inputs=attn_output_2)
 
-        return ff_output_2, tc.stack([new_kvs_1, new_kvs_2], dim=1)
+        return ff_output_2, tc.stack([new_kvs_0, new_kvs_1, new_kvs_2], dim=1)
 
 
 class SparseTransformerXL(tc.nn.Module):

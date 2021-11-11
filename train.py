@@ -121,8 +121,8 @@ def create_architecture(
     elif architecture == 'sparse_transformer':
         return SparseTransformerXL(
             input_dim=input_dim,
-            n_layer=12,
-            n_head=8,
+            n_layer=4,
+            n_head=4,
             d_model=num_features,
             d_head=(num_features // 4),
             n_context=context_size)
