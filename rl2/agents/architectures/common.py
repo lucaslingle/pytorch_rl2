@@ -164,8 +164,8 @@ class MultiheadSelfAttention(tc.nn.Module):
             if sampling:
                 assert qs.shape[1] == 1
                 mod = ks.shape[1] % self._row_len
-                ks = ks[:, -(self._row_len-mod):, :]  # get relevant row
-                vs = vs[:, -(self._row_len-mod):, :]
+                ks = ks[:, -mod:, :]  # get relevant row
+                vs = vs[:, -mod:, :]
                 return qs, ks, vs, qs.shape[0]
             else:
                 assert qs.shape[1] == ks.shape[1] == vs.shape[1]
