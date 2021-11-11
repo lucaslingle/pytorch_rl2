@@ -183,6 +183,8 @@ def training_loop(
         # collect meta-episodes...
         meta_episodes = list()
         for _ in range(0, meta_episodes_per_policy_update):
+            if comm.Get_rank() == ROOT_RANK:
+                print(_)
             # collect one meta-episode and append it to the list
             meta_episode = generate_meta_episode(
                 env=env,
