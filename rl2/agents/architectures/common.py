@@ -206,6 +206,7 @@ class MultiheadSelfAttention(tc.nn.Module):
             return attn_out
 
         if self._attention_style == 'locally_banded_dense':
+            attn_out = tc.reshape(attn_out, [-1, input_len, attn_out.shape[-1]])
             return attn_out
 
         if self._attention_style == 'strided_sparse':
