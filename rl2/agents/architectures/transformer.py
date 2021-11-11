@@ -262,18 +262,6 @@ class SparseTransformerXL(tc.nn.Module):
     using the attention operations introduced by Dhariwal et al., 2020,
     and the relative position encoding from Dai et al., 2019,
     and the reordered layer ordering from Parisotto et al., 2019.
-
-    Note that at this stage in development,
-    there is a mismatch between the computational behavior of this module
-    during acting and learning: the pad length for locally banded dense
-    and strided sparse attention depends on the current combined segment length
-    t1+t2 through the mod operation t1+t2 % row_len, and thus the padding used
-    during training differs from the padding used during learning,
-    when the full sequence of length n_context is available.
-
-    This will create at least a slight mismatch in the state visitation frequencies.
-    In addition, this variant is still very slow during acting,
-    as we have not exploited sparsity at all.
     """
     def __init__(self, input_dim, n_layer, n_head, d_model, d_head, n_context):
         super().__init__()
