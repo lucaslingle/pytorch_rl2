@@ -258,7 +258,7 @@ class SparseTransformerXLILayer(tc.nn.Module):
 
 class SparseTransformerXL(tc.nn.Module):
     """
-    Implements a Sparse Transformer (Child et al., 2019) variant,
+    Implements a Sparse Transformer (Child et al., 2019) variant:
     using the attention operations introduced by Dhariwal et al., 2020,
     and the relative position encoding from Dai et al., 2019,
     and the reordered layer ordering from Parisotto et al., 2019.

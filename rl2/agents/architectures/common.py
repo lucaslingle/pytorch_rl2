@@ -170,9 +170,9 @@ class MultiheadSelfAttention(tc.nn.Module):
         elif self._attention_style == 'strided_sparse':
             if sampling:
                 assert qs.shape[1] == 1
-                mod = ks.shape[1] % self._row_len
-                ks = ks[:, (mod-1)::self._row_len, :]  # get relevant column
-                vs = vs[:, (mod-1)::self._row_len, :]
+                mod = (ks.shape[1]-1) % self._row_len
+                ks = ks[:, mod::self._row_len, :]  # get relevant column
+                vs = vs[:, mod::self._row_len, :]
                 return qs, ks, vs, qs.shape[0]
             else:
                 assert qs.shape[1] == ks.shape[1] == vs.shape[1]
