@@ -188,11 +188,12 @@ class TrXLI(tc.nn.Module):
         return features, new_kvs
 
 
-class SparseTransformerXLLayer(tc.nn.Module):
+class SparseTransformerXLILayer(tc.nn.Module):
     """
     Implements one layer of a Sparse Transformer (Child et al., 2019) variant,
     using the attention operations introduced by Dhariwal et al., 2020,
-    and the relative position encoding from Dai et al., 2019.
+    and the relative position encoding from Dai et al., 2019,
+    and the reordered layer ordering from Parisotto et al., 2019.
     """
     def __init__(self, d_model, n_head, d_head, n_context):
         super().__init__()
@@ -208,7 +209,7 @@ class SparseTransformerXLLayer(tc.nn.Module):
             position_encoding_style='rel',
             attention_style='locally_banded_dense',
             connection_style='residual',
-            activation=None,
+            activation=tc.nn.ReLU(),
             use_ln=True,
             row_len=int(n_context ** 0.5))
 
@@ -219,7 +220,7 @@ class SparseTransformerXLLayer(tc.nn.Module):
             position_encoding_style='rel',
             attention_style='strided_sparse',
             connection_style='residual',
-            activation=None,
+            activation=tc.nn.ReLU(),
             use_ln=True,
             row_len=int(n_context ** 0.5))
 
@@ -229,7 +230,7 @@ class SparseTransformerXLLayer(tc.nn.Module):
             output_dim=self._d_model,
             connection_style='residual',
             hidden_activation=tc.nn.ReLU(),
-            output_activation=None,
+            output_activation=tc.nn.ReLU(),
             use_ln=True)
 
     def forward(self, inputs, past_kvs=None):
@@ -259,7 +260,20 @@ class SparseTransformerXL(tc.nn.Module):
     """
     Implements a Sparse Transformer (Child et al., 2019) variant,
     using the attention operations introduced by Dhariwal et al., 2020,
-    and the relative position encoding from Dai et al., 2019.
+    and the relative position encoding from Dai et al., 2019,
+    and the reordered layer ordering from Parisotto et al., 2019.
+
+    Note that at this stage in development,
+    there is a mismatch between the computational behavior of this module
+    during acting and learning: the pad length for locally banded dense
+    and strided sparse attention depends on the current combined segment length
+    t1+t2 through the mod operation t1+t2 % row_len, and thus the padding used
+    during training differs from the padding used during learning,
+    when the full sequence of length n_context is available.
+
+    This will create at least a slight mismatch in the state visitation frequencies.
+    In addition, this variant is still very slow during acting,
+    as we have not exploited sparsity at all.
     """
     def __init__(self, input_dim, n_layer, n_head, d_model, d_head, n_context):
         super().__init__()
@@ -275,7 +289,7 @@ class SparseTransformerXL(tc.nn.Module):
         tc.nn.init.xavier_normal_(self._lin.weight)
 
         self._transformer_layers = tc.nn.ModuleList([
-            SparseTransformerXLLayer(
+            SparseTransformerXLILayer(
                 d_model=self._d_model,
                 n_head=self._n_head,
                 d_head=self._d_head,
@@ -312,6 +326,7 @@ class SparseTransformerXL(tc.nn.Module):
         past_kvs = [None] * self._n_layer if prev_state is None else prev_state
 
         inputs = self._lin(inputs)
+        inputs = tc.nn.ReLU()(inputs)
 
         new_kvs_by_layer = []
         for l in range(0, self._n_layer):
@@ -319,8 +334,7 @@ class SparseTransformerXL(tc.nn.Module):
                 inputs=inputs, past_kvs=past_kvs[l])
             new_kvs_by_layer.append(new_kvs)
 
-        inputs = self._ln(inputs)
-        features = tc.nn.ReLU()(inputs)
+        features = self._ln(inputs)
         new_kvs = tc.stack(new_kvs_by_layer, dim=0)
 
         if features.shape[1] == 1:
