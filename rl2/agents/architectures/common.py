@@ -148,96 +148,76 @@ class MultiheadSelfAttention(tc.nn.Module):
                 bias=False)
             tc.nn.init.xavier_normal_(self._proj_linear.weight)
 
-    def attn_preop(self, qs, ks, vs):
+    def attn_preop(self, qs, ks, vs, sampling):
         if self._attention_style == 'full':
             return qs, ks, vs, qs.shape[0]
 
-        mod = qs.shape[1] % self._row_len
-        if mod > 0:
-            pad_len = self._row_len - mod
-            zp = tc.zeros(size=(qs.shape[0], pad_len, qs.shape[2]))
-            qs = tc.cat((zp, qs), dim=1)
-
-        mod = ks.shape[1] % self._row_len
-        if mod > 0:
-            pad_len = self._row_len - mod
-            zpk = tc.zeros(size=(ks.shape[0], pad_len, ks.shape[2]))
-            zpv = tc.zeros(size=(vs.shape[0], pad_len, vs.shape[2]))
-            ks = tc.cat((zpk, ks), dim=1)
-            vs = tc.cat((zpv, vs), dim=1)
-
         if self._attention_style == 'locally_banded_dense':
-            # TODO(lucaslingle):
-            #   What if ks/vs is padded more or less than qs?
-            #   What happens to causality?
-            #
-            #   I think nothing, because here we truncate k and v
-            #   at the padded query length P2+T2.
+            if sampling:
+                assert qs.shape[1] == 1
+                mod = ks.shape[1] % self._row_len
+                ks = ks[:, -mod:, :]  # get relevant row
+                vs = vs[:, -mod:, :]
+                return qs, ks, vs, qs.shape[0]
+            else:
+                assert qs.shape[1] == ks.shape[1] == vs.shape[1]
+                assert qs.shape[1] % self._row_len == 0
+                qs = tc.reshape(qs, [-1, self._row_len, qs.shape[-1]])
+                ks = tc.reshape(ks, [-1, self._row_len, ks.shape[-1]])
+                vs = tc.reshape(vs, [-1, self._row_len, vs.shape[-1]])
+                return qs, ks, vs, qs.shape[0]
 
-            ks = ks[:, -qs.shape[1]:, :]
-            vs = vs[:, -qs.shape[1]:, :]
+        elif self._attention_style == 'strided_sparse':
+            if sampling:
+                assert qs.shape[1] == 1
+                mod = ks.shape[1] % self._row_len
+                ks = ks[:, (mod-1)::self._row_len, :]  # get relevant column
+                vs = vs[:, (mod-1)::self._row_len, :]
+                return qs, ks, vs, qs.shape[0]
+            else:
+                assert qs.shape[1] == ks.shape[1] == vs.shape[1]
+                assert qs.shape[1] % self._row_len == 0
 
-            qs = tc.reshape(qs, [qs.shape[0], qs.shape[1] // self._row_len, self._row_len, qs.shape[2]])
-            ks = tc.reshape(ks, [ks.shape[0], ks.shape[1] // self._row_len, self._row_len, ks.shape[2]])
-            vs = tc.reshape(vs, [vs.shape[0], vs.shape[1] // self._row_len, self._row_len, vs.shape[2]])
+                batch_size = qs.shape[0]
+                n_rows = qs.shape[1] // self._row_len
+                n_feature = qs.shape[2]
+                block_shape = [batch_size, n_rows, self._row_len, n_feature]
 
-            zpk = tc.zeros_like(ks[:, 0:1, :, :])
-            ks = tc.cat(
-                (tc.cat((zpk, ks[:, :-1, :, :]), dim=1), ks),
-                dim=2)
-            zpv = tc.zeros_like(vs[:, 0:1, :, :])
-            vs = tc.cat(
-                (tc.cat((zpv, vs[:, :-1, :, :]), dim=1), vs),
-                dim=2)
+                qs = tc.reshape(qs, block_shape)
+                ks = tc.reshape(ks, block_shape)
+                vs = tc.reshape(vs, block_shape)
 
-            qs = tc.reshape(qs, [-1, self._row_len, qs.shape[-1]])      # [B*((P2+T2) // R), R, H*F], batch idx * row idx, col idx, features
-            ks = tc.reshape(ks, [-1, 2 * self._row_len, ks.shape[-1]])  # [B*((P2+T2) // R), 2*R, H*F]
-            vs = tc.reshape(vs, [-1, 2 * self._row_len, vs.shape[-1]])  # [B*((P2+T2) // R), 2*R, H*F]
+                qs = qs.permute(0, 2, 1, 3)
+                ks = ks.permute(0, 2, 1, 3)
+                vs = vs.permute(0, 2, 1, 3)
 
-            return qs, ks, vs, qs.shape[0]
+                qs = tc.reshape(qs, [-1, n_rows, n_feature])
+                ks = tc.reshape(ks, [-1, n_rows, n_feature])
+                vs = tc.reshape(vs, [-1, n_rows, n_feature])
+                return qs, ks, vs, qs.shape[0]
 
-        if self._attention_style == 'strided_sparse':
-            # TODO(lucaslingle):
-            #   What if ks/vs is padded more or less than qs?
-            #   What happens to causality?
-            #
-            #   I think nothing, because P2+T2 is always less than or equal to P1+T1+T2, so ((P1+T1+T2) // R) >= ((P2+T2) // R).
-            #   Currently the mask for the ((P2+T2) // R) query entries is exactly the same as in classical attention,
-            #   and since the T2 // R queries are still aligned as the final elements in the time axis of q, k, v, (no wrapping to next batch row!)
-            #   queries from the original T2 // R entries are prevented from attending to future indices.
-            #
-            qs = tc.reshape(qs, [qs.shape[0], qs.shape[1] // self._row_len, self._row_len, qs.shape[2]])
-            ks = tc.reshape(ks, [ks.shape[0], ks.shape[1] // self._row_len, self._row_len, ks.shape[2]])
-            vs = tc.reshape(vs, [vs.shape[0], vs.shape[1] // self._row_len, self._row_len, vs.shape[2]])
+        else:
+            raise NotImplementedError
 
-            qs = qs.permute(0, 2, 1, 3)
-            ks = ks.permute(0, 2, 1, 3)
-            vs = vs.permute(0, 2, 1, 3)
+    def attn_postop(self, attn_out, input_len, sampling):
+        assert input_len % self._row_len == 0 or sampling
 
-            qs = tc.reshape(qs, [-1, qs.shape[2], qs.shape[3]])  # [B*R, ((P2+T2) // R),    H*F], batch idx * col idx, query row idx, features
-            ks = tc.reshape(ks, [-1, ks.shape[2], ks.shape[3]])  # [B*R, ((P1+T1+T2) // R), H*F]
-            vs = tc.reshape(vs, [-1, vs.shape[2], vs.shape[3]])  # [B*R, ((P1+T1+T2) // R), H*F]
-
-            return qs, ks, vs, qs.shape[0]
-
-    def attn_postop(self, attn_out, input_len):
         if self._attention_style == 'full':
             return attn_out
 
-        mod = input_len % self._row_len
-        pad_len = 0 if mod == 0 else self._row_len - mod
-
         if self._attention_style == 'locally_banded_dense':
-            attn_out = tc.reshape(attn_out, [-1, pad_len+input_len, attn_out.shape[2]])
-            attn_out = attn_out[:, pad_len:, :]
             return attn_out
 
         if self._attention_style == 'strided_sparse':
-            attn_out = tc.reshape(attn_out, [-1, self._row_len, (pad_len + input_len) // self._row_len, attn_out.shape[2]])
-            attn_out = attn_out.permute(0, 2, 1, 3)
-            attn_out = tc.reshape(attn_out, [-1, (pad_len + input_len), attn_out.shape[-1]])
-            attn_out = attn_out[:, pad_len:, :]
-            return attn_out
+            if sampling:
+                return attn_out
+            else:
+                n_rows = input_len // self._row_len
+                transposed_block_shape = [-1, self._row_len, n_rows, attn_out.shape[-1]]
+                attn_out = tc.reshape(attn_out, transposed_block_shape)
+                attn_out = attn_out.permute(0, 2, 1, 3)
+                attn_out = tc.reshape(attn_out, [-1, input_len, attn_out.shape[-1]])
+                return attn_out
 
     def split_heads(self, inputs):
         return tc.cat(tc.chunk(inputs, self._num_heads, dim=-1), dim=0)
@@ -256,6 +236,7 @@ class MultiheadSelfAttention(tc.nn.Module):
             and new_kvs tensor of shape [B, T1+T2, H*F*2]
         """
         assert inputs.shape[-1] == self._input_dim
+        sampling = (inputs.shape[1] == 1)
 
         qkv = self._qkv_linear(inputs)
         qs, ks, vs = tc.chunk(qkv, 3, dim=-1)
@@ -266,8 +247,8 @@ class MultiheadSelfAttention(tc.nn.Module):
             vs = tc.cat((past_vs, vs), dim=1)
         new_kvs = tc.cat((ks, vs), dim=-1)  # [B, T1+T2, H*F*2]
 
-        qs, ks, vs, bsp = self.attn_preop(qs, ks, vs)           # [B', ..., H*F]
-        qs, ks, vs = list(map(self.split_heads, [qs, ks, vs]))  # [B'*H, ..., F]
+        qs, ks, vs, bsp = self.attn_preop(qs, ks, vs, sampling)  # [B', ..., H*F]
+        qs, ks, vs = list(map(self.split_heads, [qs, ks, vs]))   # [B'*H, ..., F]
 
         if self._position_encoding_style == 'rel':
             batch_size, src_len, d_model = bsp, ks.shape[1], inputs.shape[-1]
@@ -288,7 +269,9 @@ class MultiheadSelfAttention(tc.nn.Module):
 
         attn_output = self.merge_heads(attn_output)  # [B', T2', H*F]
         attn_output = self.attn_postop(
-            attn_output, input_len=inputs.shape[1])  # [B, T2, H*F]
+            attn_output,
+            input_len=inputs.shape[1],
+            sampling=sampling)  # [B, T2, H*F]
 
         if self._connection_style == 'residual':
             attn_output = self._proj_linear(attn_output)
