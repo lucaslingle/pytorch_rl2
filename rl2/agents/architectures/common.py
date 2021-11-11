@@ -152,7 +152,7 @@ class MultiheadSelfAttention(tc.nn.Module):
         if self._attention_style == 'full':
             return qs, ks, vs, qs.shape[0]
 
-        if self._attention_style == 'locally_banded_dense':
+        elif self._attention_style == 'locally_banded_dense':
             if sampling:
                 assert qs.shape[1] == 1
                 mod = ks.shape[1] % self._row_len
