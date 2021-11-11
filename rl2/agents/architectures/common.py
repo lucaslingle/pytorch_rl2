@@ -152,7 +152,7 @@ class MultiheadSelfAttention(tc.nn.Module):
         if self._attention_style == 'full':
             return qs, ks, vs, qs.shape[0]
 
-        elif self._attention_style == 'locally_banded_dense':
+        if self._attention_style == 'locally_banded_dense':
             if sampling:
                 assert qs.shape[1] == 1
                 mod = ks.shape[1] % self._row_len
@@ -167,7 +167,7 @@ class MultiheadSelfAttention(tc.nn.Module):
                 vs = tc.reshape(vs, [-1, self._row_len, vs.shape[-1]])
                 return qs, ks, vs, qs.shape[0]
 
-        elif self._attention_style == 'strided_sparse':
+        if self._attention_style == 'strided_sparse':
             if sampling:
                 assert qs.shape[1] == 1
                 mod = (ks.shape[1]-1) % self._row_len
@@ -196,8 +196,7 @@ class MultiheadSelfAttention(tc.nn.Module):
                 vs = tc.reshape(vs, [-1, n_rows, n_feature])
                 return qs, ks, vs, qs.shape[0]
 
-        else:
-            raise NotImplementedError
+        raise NotImplementedError
 
     def attn_postop(self, attn_out, input_len, sampling):
         assert input_len % self._row_len == 0 or sampling
@@ -205,14 +204,14 @@ class MultiheadSelfAttention(tc.nn.Module):
         if self._attention_style == 'full':
             return attn_out
 
-        elif self._attention_style == 'locally_banded_dense':
+        if self._attention_style == 'locally_banded_dense':
             if sampling:
                 return attn_out
             else:
                 attn_out = tc.reshape(attn_out, [-1, input_len, attn_out.shape[-1]])
                 return attn_out
 
-        elif self._attention_style == 'strided_sparse':
+        if self._attention_style == 'strided_sparse':
             if sampling:
                 return attn_out
             else:
@@ -223,8 +222,7 @@ class MultiheadSelfAttention(tc.nn.Module):
                 attn_out = tc.reshape(attn_out, [-1, input_len, attn_out.shape[-1]])
                 return attn_out
 
-        else:
-            raise NotImplementedError
+        raise NotImplementedError
 
     def split_heads(self, inputs):
         return tc.cat(tc.chunk(inputs, self._num_heads, dim=-1), dim=0)
