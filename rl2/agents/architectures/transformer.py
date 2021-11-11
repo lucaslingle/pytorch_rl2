@@ -213,6 +213,15 @@ class SparseTransformerXLILayer(tc.nn.Module):
             use_ln=True,
             row_len=int(n_context ** 0.5))
 
+        self._ff1 = FF(
+            input_dim=self._d_model,
+            hidden_dim=(2 * self._d_model),
+            output_dim=self._d_model,
+            connection_style='residual',
+            hidden_activation=tc.nn.ReLU(),
+            output_activation=tc.nn.ReLU(),
+            use_ln=True)
+
         self._attn2 = MultiheadSelfAttention(
             input_dim=self._d_model,
             num_heads=self._n_head,
@@ -224,7 +233,7 @@ class SparseTransformerXLILayer(tc.nn.Module):
             use_ln=True,
             row_len=int(n_context ** 0.5))
 
-        self._ff = FF(
+        self._ff2 = FF(
             input_dim=self._d_model,
             hidden_dim=(2 * self._d_model),
             output_dim=self._d_model,
@@ -246,14 +255,14 @@ class SparseTransformerXLILayer(tc.nn.Module):
         past_kvs_for_layer_1 = None if past_kvs is None else past_kvs[:, 0]
         attn_output_1, new_kvs_1 = self._attn1(
             inputs=inputs, past_kvs=past_kvs_for_layer_1)
+        ff_output_1 = self._ff1(attn_output_1)
 
         past_kvs_for_layer_2 = None if past_kvs is None else past_kvs[:, 1]
         attn_output_2, new_kvs_2 = self._attn2(
-            inputs=attn_output_1, past_kvs=past_kvs_for_layer_2)
+            inputs=ff_output_1, past_kvs=past_kvs_for_layer_2)
+        ff_output_2 = self._ff2(inputs=attn_output_2)
 
-        ff_output = self._ff(inputs=attn_output_2)
-
-        return ff_output, tc.stack([new_kvs_1, new_kvs_2], dim=1)
+        return ff_output_2, tc.stack([new_kvs_1, new_kvs_2], dim=1)
 
 
 class SparseTransformerXL(tc.nn.Module):

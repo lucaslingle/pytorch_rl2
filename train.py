@@ -114,15 +114,15 @@ def create_architecture(
     elif architecture == 'trxli':
         return TrXLI(
             input_dim=input_dim,
-            n_layer=6,
-            n_head=4,
+            n_layer=12,
+            n_head=8,
             d_model=num_features,
             d_head=(num_features // 4))
     elif architecture == 'sparse_transformer':
         return SparseTransformerXL(
             input_dim=input_dim,
-            n_layer=6,
-            n_head=4,
+            n_layer=12,
+            n_head=8,
             d_model=num_features,
             d_head=(num_features // 4),
             n_context=context_size)
