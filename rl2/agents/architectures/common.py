@@ -180,7 +180,7 @@ class MultiheadSelfAttention(tc.nn.Module):
                 assert qs.shape[1] == 1
                 row_idx = (ks.shape[1]-1) // self._row_len
                 prev_row_flat_idx = (row_idx - 1) * self._row_len
-                if prev_row_flat_idx > 0:
+                if row_idx > 0:
                     ks = ks[:, prev_row_flat_idx:prev_row_flat_idx+self._row_len, :]
                     vs = vs[:, prev_row_flat_idx:prev_row_flat_idx+self._row_len, :]
                     return qs, ks, vs, qs.shape[0]
