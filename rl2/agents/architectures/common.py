@@ -297,7 +297,7 @@ class MultiheadSelfAttention(tc.nn.Module):
 
         x = inputs
         if self._use_ln:
-            x = self._ln(inputs)
+            x = self._ln(x)
 
         qkv = self._qkv_linear(x)
         qs, ks, vs = tc.chunk(qkv, 3, dim=-1)
