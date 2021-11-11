@@ -205,14 +205,14 @@ class MultiheadSelfAttention(tc.nn.Module):
         if self._attention_style == 'full':
             return attn_out
 
-        if self._attention_style == 'locally_banded_dense':
+        elif self._attention_style == 'locally_banded_dense':
             if sampling:
                 return attn_out
             else:
                 attn_out = tc.reshape(attn_out, [-1, input_len, attn_out.shape[-1]])
                 return attn_out
 
-        if self._attention_style == 'strided_sparse':
+        elif self._attention_style == 'strided_sparse':
             if sampling:
                 return attn_out
             else:
@@ -222,6 +222,9 @@ class MultiheadSelfAttention(tc.nn.Module):
                 attn_out = attn_out.permute(0, 2, 1, 3)
                 attn_out = tc.reshape(attn_out, [-1, input_len, attn_out.shape[-1]])
                 return attn_out
+
+        else:
+            raise NotImplementedError
 
     def split_heads(self, inputs):
         return tc.cat(tc.chunk(inputs, self._num_heads, dim=-1), dim=0)
