@@ -273,9 +273,9 @@ class SparseTransformerXLILayer(tc.nn.Module):
             and new_kvs tensor of shape [B, 2, T1+T2, H*F*2]
         """
         past_kvs_for_layer_0 = None if past_kvs is None else past_kvs[:, 0]
-        attn_output_0, new_kvs_0 = self._attn1(
+        attn_output_0, new_kvs_0 = self._attn0(
             inputs=inputs, past_kvs=past_kvs_for_layer_0)
-        ff_output_0 = self._ff1(attn_output_0)
+        ff_output_0 = self._ff0(attn_output_0)
 
         past_kvs_for_layer_1 = None if past_kvs is None else past_kvs[:, 1]
         attn_output_1, new_kvs_1 = self._attn1(

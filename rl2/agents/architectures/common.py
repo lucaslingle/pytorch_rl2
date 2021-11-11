@@ -243,10 +243,10 @@ class MultiheadSelfAttention(tc.nn.Module):
         raise NotImplementedError
 
     def attn_postop(self, attn_out, input_len, sampling):
-        assert input_len % self._row_len == 0 or sampling
-
         if self._attention_style == 'full':
             return attn_out
+
+        assert input_len % self._row_len == 0 or sampling
 
         if self._attention_style == 'row':
             if sampling:
