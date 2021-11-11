@@ -127,14 +127,6 @@ class MultiheadSelfAttention(tc.nn.Module):
         self._use_ln = use_ln
         self._row_len = row_len
 
-        # TODO(lucaslingle):
-        #   [Done](1) add layernorm here and in forward method,
-        #   [Done](2) convert attention names to row and column,
-        #   (3) add prev_row attention since start of each row only attends
-        #      to itself and previous start of rows,
-        #      making it only see a subset of experience
-        #   [Done](4) fix snail to use the updated constructor argument names
-
         if self._use_ln:
             self._ln = LayerNorm(units=self._input_dim)
 
