@@ -205,10 +205,9 @@ class MultiheadSelfAttention(tc.nn.Module):
                 ks = tc.nn.functional.pad(ks[:,:-1,:,:], (0,0,0,0,1,0))
                 vs = tc.nn.functional.pad(vs[:,:-1,:,:], (0,0,0,0,1,0))
 
-                qs = tc.reshape(qs, [-1, self._row_len, qs.shape[-1]])
-                ks = tc.reshape(ks, [-1, self._row_len, ks.shape[-1]])
-                vs = tc.reshape(vs, [-1, self._row_len, vs.shape[-1]])
-
+                qs = tc.reshape(qs, [-1, self._row_len, n_feature])
+                ks = tc.reshape(ks, [-1, self._row_len, n_feature])
+                vs = tc.reshape(vs, [-1, self._row_len, n_feature])
                 return qs, ks, vs, qs.shape[0]
 
         if self._attention_style == 'column':

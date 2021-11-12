@@ -218,7 +218,7 @@ class SparseTransformerXLI(tc.nn.Module):
         self._d_model = d_model
         self._d_head = d_head
         self._n_context = n_context
-        self._attention_styles = ['row', 'previous_row', 'column']
+        self._attention_styles = ['row', 'column', 'previous_row']
 
         self._lin = tc.nn.Linear(
             self._input_dim, self._d_model, bias=False)
