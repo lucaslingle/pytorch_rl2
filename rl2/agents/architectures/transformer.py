@@ -2,6 +2,8 @@
 Implements Transformer architectures for RL^2.
 """
 
+import math
+
 import torch as tc
 
 from rl2.agents.architectures.common import LayerNorm, MultiheadSelfAttention
@@ -231,11 +233,20 @@ class SparseTransformerXLI(tc.nn.Module):
                 d_head=self._d_head,
                 d_ff=self._d_model,
                 attention_style=self._attention_styles[l % 3],
-                row_len=int(self._n_context ** 0.5))
+                row_len=self._row_len)
             for l in range(0, self._n_layer)
         ])
 
         self._ln = LayerNorm(units=self._d_model)
+
+    @property
+    def _row_len(self):
+        small = math.floor(self._n_context ** 0.5)
+        big = self._n_context // small
+        while small * big != self._n_context:
+            small -= 1
+            big = self._n_context // small
+        return small
 
     @property
     def output_dim(self):
