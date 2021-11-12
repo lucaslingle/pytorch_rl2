@@ -77,25 +77,38 @@ class FF(tc.nn.Module):
 
 
 class TransformerXLILayer(tc.nn.Module):
-    def __init__(self, d_model, n_head, d_head):
+    def __init__(
+            self,
+            d_model,
+            n_head,
+            d_head,
+            d_ff,
+            attention_style,
+            row_len=None
+    ):
+        assert attention_style == 'full' or row_len is not None
         super().__init__()
         self._d_model = d_model
         self._n_head = n_head
         self._d_head = d_head
+        self._d_ff = d_ff
+        self._attention_style = attention_style
+        self._row_len = row_len
 
         self._attn = MultiheadSelfAttention(
             input_dim=self._d_model,
             num_heads=self._n_head,
             num_head_features=self._d_head,
             position_encoding_style='rel',
-            attention_style='full',
+            attention_style=self._attention_style,
             connection_style='residual',
             activation=tc.nn.ReLU(),
-            use_ln=True)
+            use_ln=True,
+            row_len=self._row_len)
 
         self._ff = FF(
             input_dim=self._d_model,
-            hidden_dim=(2 * self._d_model),
+            hidden_dim=self._d_ff,
             output_dim=self._d_model,
             connection_style='residual',
             hidden_activation=tc.nn.ReLU(),
@@ -118,7 +131,7 @@ class TransformerXLILayer(tc.nn.Module):
         return ff_output, new_kvs
 
 
-class TrXLI(tc.nn.Module):
+class TransformerXLI(tc.nn.Module):
     """
     Implements the Transformer XL-I from Parisotto et al., 2019.
     """
@@ -138,7 +151,9 @@ class TrXLI(tc.nn.Module):
             TransformerXLILayer(
                 d_model=self._d_model,
                 n_head=self._n_head,
-                d_head=self._d_head)
+                d_head=self._d_head,
+                d_ff=self._d_model,
+                attention_style='full')
             for _ in range(0, self._n_layer)
         ])
 
@@ -188,109 +203,7 @@ class TrXLI(tc.nn.Module):
         return features, new_kvs
 
 
-class SparseTransformerXLILayer(tc.nn.Module):
-    """
-    Implements one layer of a Sparse Transformer (Child et al., 2019) variant,
-    using the attention operations introduced by Dhariwal et al., 2020,
-    and the relative position encoding from Dai et al., 2019,
-    and the reordered layer ordering from Parisotto et al., 2019.
-    """
-    def __init__(self, d_model, n_head, d_head, n_context):
-        super().__init__()
-        self._d_model = d_model
-        self._n_head = n_head
-        self._d_head = d_head
-        self._n_context = n_context
-
-        self._attn0 = MultiheadSelfAttention(
-            input_dim=self._d_model,
-            num_heads=self._n_head,
-            num_head_features=self._d_head,
-            position_encoding_style='rel',
-            attention_style='row',
-            connection_style='residual',
-            activation=tc.nn.ReLU(),
-            use_ln=True,
-            row_len=int(n_context ** 0.5))
-
-        self._ff0 = FF(
-            input_dim=self._d_model,
-            hidden_dim=(2 * self._d_model),
-            output_dim=self._d_model,
-            connection_style='residual',
-            hidden_activation=tc.nn.ReLU(),
-            output_activation=tc.nn.ReLU(),
-            use_ln=True)
-
-        self._attn1 = MultiheadSelfAttention(
-            input_dim=self._d_model,
-            num_heads=self._n_head,
-            num_head_features=self._d_head,
-            position_encoding_style='rel',
-            attention_style='previous_row',
-            connection_style='residual',
-            activation=tc.nn.ReLU(),
-            use_ln=True,
-            row_len=int(n_context ** 0.5))
-
-        self._ff1 = FF(
-            input_dim=self._d_model,
-            hidden_dim=(2 * self._d_model),
-            output_dim=self._d_model,
-            connection_style='residual',
-            hidden_activation=tc.nn.ReLU(),
-            output_activation=tc.nn.ReLU(),
-            use_ln=True)
-
-        self._attn2 = MultiheadSelfAttention(
-            input_dim=self._d_model,
-            num_heads=self._n_head,
-            num_head_features=self._d_head,
-            position_encoding_style='rel',
-            attention_style='column',
-            connection_style='residual',
-            activation=tc.nn.ReLU(),
-            use_ln=True,
-            row_len=int(n_context ** 0.5))
-
-        self._ff2 = FF(
-            input_dim=self._d_model,
-            hidden_dim=(2 * self._d_model),
-            output_dim=self._d_model,
-            connection_style='residual',
-            hidden_activation=tc.nn.ReLU(),
-            output_activation=tc.nn.ReLU(),
-            use_ln=True)
-
-    def forward(self, inputs, past_kvs=None):
-        """
-        Args:
-            inputs: input vec tensor of shape [B, T2, I]
-            past_kvs: optional past kvs with shape [B, 3, T1, H*F*2]
-
-        Returns:
-            output tensor of shape [B, T2, I]
-            and new_kvs tensor of shape [B, 2, T1+T2, H*F*2]
-        """
-        past_kvs_for_layer_0 = None if past_kvs is None else past_kvs[:, 0]
-        attn_output_0, new_kvs_0 = self._attn0(
-            inputs=inputs, past_kvs=past_kvs_for_layer_0)
-        ff_output_0 = self._ff0(attn_output_0)
-
-        past_kvs_for_layer_1 = None if past_kvs is None else past_kvs[:, 1]
-        attn_output_1, new_kvs_1 = self._attn1(
-            inputs=ff_output_0, past_kvs=past_kvs_for_layer_1)
-        ff_output_1 = self._ff1(attn_output_1)
-
-        past_kvs_for_layer_2 = None if past_kvs is None else past_kvs[:, 2]
-        attn_output_2, new_kvs_2 = self._attn2(
-            inputs=ff_output_1, past_kvs=past_kvs_for_layer_2)
-        ff_output_2 = self._ff2(inputs=attn_output_2)
-
-        return ff_output_2, tc.stack([new_kvs_0, new_kvs_1, new_kvs_2], dim=1)
-
-
-class SparseTransformerXL(tc.nn.Module):
+class SparseTransformerXLI(tc.nn.Module):
     """
     Implements a Sparse Transformer (Child et al., 2019) variant:
     using the attention operations introduced by Dhariwal et al., 2020,
@@ -305,18 +218,21 @@ class SparseTransformerXL(tc.nn.Module):
         self._d_model = d_model
         self._d_head = d_head
         self._n_context = n_context
+        self._attention_styles = ['row', 'previous_row', 'column']
 
         self._lin = tc.nn.Linear(
             self._input_dim, self._d_model, bias=False)
         tc.nn.init.xavier_normal_(self._lin.weight)
 
         self._transformer_layers = tc.nn.ModuleList([
-            SparseTransformerXLILayer(
+            TransformerXLILayer(
                 d_model=self._d_model,
                 n_head=self._n_head,
                 d_head=self._d_head,
-                n_context=self._n_context)
-            for _ in range(0, self._n_layer)
+                d_ff=self._d_model,
+                attention_style=self._attention_styles[l % 3],
+                row_len=int(self._n_context ** 0.5))
+            for l in range(0, self._n_layer)
         ])
 
         self._ln = LayerNorm(units=self._d_model)

@@ -13,7 +13,7 @@ from rl2.envs.mdp_env import MDPEnv
 from rl2.agents.preprocessing.tabular import MABPreprocessing, MDPPreprocessing
 from rl2.agents.architectures.gru import GRU
 from rl2.agents.architectures.snail import SNAIL
-from rl2.agents.architectures.transformer import TrXLI, SparseTransformerXL
+from rl2.agents.architectures.transformer import TransformerXLI, SparseTransformerXLI
 from rl2.agents.heads.policy_heads import LinearPolicyHead
 from rl2.agents.heads.value_heads import LinearValueHead
 from rl2.agents.integration.policy_net import StatefulPolicyNet
@@ -112,17 +112,17 @@ def create_architecture(
             context_size=context_size,
             use_ln=True)
     elif architecture == 'trxli':
-        return TrXLI(
+        return TransformerXLI(
             input_dim=input_dim,
             n_layer=12,
             n_head=8,
             d_model=num_features,
             d_head=(num_features // 4))
     elif architecture == 'sparse_transformer':
-        return SparseTransformerXL(
+        return SparseTransformerXLI(
             input_dim=input_dim,
-            n_layer=4,
-            n_head=4,
+            n_layer=12,
+            n_head=8,
             d_model=num_features,
             d_head=(num_features // 4),
             n_context=context_size)
