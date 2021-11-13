@@ -7,7 +7,8 @@ import torch as tc
 import numpy as np
 
 from rl2.envs.abstract import MetaEpisodicEnv
-from rl2.agents.abstract import StatefulPolicyNet, StatefulValueNet
+from rl2.agents.integration.policy_net import StatefulPolicyNet
+from rl2.agents.integration.value_net import StatefulValueNet
 
 
 class MetaEpisode:
