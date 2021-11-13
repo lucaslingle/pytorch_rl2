@@ -2,6 +2,7 @@
 Implements Transformer architectures for RL^2.
 """
 
+from typing import List, Tuple
 import math
 
 import torch as tc
@@ -255,18 +256,18 @@ class SparseTransformerXLI(tc.nn.Module):
     def initial_state(self, batch_size):
         return None
 
-    def forward(self, inputs, prev_state=None):
+    def forward(self, inputs, prev_state):
         """
         Args:
             inputs: input vec tensor of shape [B, ..., I]
-            prev_state: optional past kvs tensor of shape [L, B, T1, H*F*2]
+            prev_state: optional previous state.
 
          Notes:
             '...' must be either one dimensional or must not exist
 
         Returns:
             output feature tensor of shape [B, ..., d_model]
-            and new_kvs tensor
+            and new state
         """
         assert len(list(inputs.shape)) in [2, 3]
         if len(list(inputs.shape)) == 2:
@@ -284,9 +285,8 @@ class SparseTransformerXLI(tc.nn.Module):
             new_kvs_by_layer.append(new_kvs)
 
         features = self._ln(inputs)
-        new_kvs = tc.stack(new_kvs_by_layer, dim=0)
 
         if features.shape[1] == 1:
             features = features.squeeze(1)
 
-        return features, new_kvs
+        return features, new_kvs_by_layer

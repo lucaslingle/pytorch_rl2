@@ -158,18 +158,27 @@ class MultiheadSelfAttention(tc.nn.Module):
 
     def attn_preop(self, qs, ks, vs, sampling):
         if self._attention_style == 'full':
+            qs = tc.stack(qs, dim=1)
+            ks = tc.stack(ks, dim=1)
+            vs = tc.stack(vs, dim=1)
             return qs, ks, vs, qs.shape[0]
 
         if self._attention_style == 'row':
             if sampling:
-                assert qs.shape[1] == 1
-                mod = ks.shape[1] % self._row_len
-                ks = ks[:, -mod:, :]  # get relevant row
-                vs = vs[:, -mod:, :]
+                assert len(qs) == 1
+                mod = len(ks) % self._row_len
+                ks = ks[-mod:]  # get relevant row
+                vs = vs[-mod:]
+                qs = tc.stack(qs, dim=1)
+                ks = tc.stack(ks, dim=1)
+                vs = tc.stack(vs, dim=1)
                 return qs, ks, vs, qs.shape[0]
             else:
-                assert qs.shape[1] == ks.shape[1] == vs.shape[1]
-                assert qs.shape[1] % self._row_len == 0
+                assert len(qs) == len(ks) == len(vs)
+                assert len(qs) % self._row_len == 0
+                qs = tc.stack(qs, dim=1)
+                ks = tc.stack(ks, dim=1)
+                vs = tc.stack(vs, dim=1)
                 qs = tc.reshape(qs, [-1, self._row_len, qs.shape[-1]])
                 ks = tc.reshape(ks, [-1, self._row_len, ks.shape[-1]])
                 vs = tc.reshape(vs, [-1, self._row_len, vs.shape[-1]])
@@ -177,21 +186,28 @@ class MultiheadSelfAttention(tc.nn.Module):
 
         if self._attention_style == 'previous_row':
             if sampling:
-                assert qs.shape[1] == 1
-                row_idx = (ks.shape[1]-1) // self._row_len
+                assert len(qs) == 1
+                row_idx = (len(ks)-1) // self._row_len
                 if row_idx > 0:
                     prev_row_flat_idx = (row_idx - 1) * self._row_len
-                    ks = ks[:, prev_row_flat_idx:prev_row_flat_idx+self._row_len, :]
-                    vs = vs[:, prev_row_flat_idx:prev_row_flat_idx+self._row_len, :]
+                    ks = ks[prev_row_flat_idx:prev_row_flat_idx+self._row_len]
+                    vs = vs[prev_row_flat_idx:prev_row_flat_idx+self._row_len]
+                    qs = tc.stack(qs, dim=1)
+                    ks = tc.stack(ks, dim=1)
+                    vs = tc.stack(vs, dim=1)
                     return qs, ks, vs, qs.shape[0]
                 else:
+                    qs = tc.stack(qs, dim=1)
                     prev_row_shape = [qs.shape[0], self._row_len, qs.shape[2]]
                     ks = tc.zeros(size=prev_row_shape, dtype=tc.float32)
                     vs = tc.zeros(size=prev_row_shape, dtype=tc.float32)
                     return qs, ks, vs, qs.shape[0]
             else:
-                assert qs.shape[1] == ks.shape[1] == vs.shape[1]
-                assert qs.shape[1] % self._row_len == 0
+                assert len(qs) == len(ks) == len(vs)
+                assert len(qs) % self._row_len == 0
+                qs = tc.stack(qs, dim=1)
+                ks = tc.stack(ks, dim=1)
+                vs = tc.stack(vs, dim=1)
 
                 batch_size = qs.shape[0]
                 n_rows = qs.shape[1] // self._row_len
@@ -212,14 +228,20 @@ class MultiheadSelfAttention(tc.nn.Module):
 
         if self._attention_style == 'column':
             if sampling:
-                assert qs.shape[1] == 1
-                mod = (ks.shape[1]-1) % self._row_len
-                ks = ks[:, mod::self._row_len, :]  # get relevant column
-                vs = vs[:, mod::self._row_len, :]
+                assert len(qs) == 1
+                mod = (len(ks)-1) % self._row_len
+                ks = ks[mod::self._row_len]  # get relevant column
+                vs = vs[mod::self._row_len]
+                qs = tc.stack(qs, dim=1)
+                ks = tc.stack(ks, dim=1)
+                vs = tc.stack(vs, dim=1)
                 return qs, ks, vs, qs.shape[0]
             else:
-                assert qs.shape[1] == ks.shape[1] == vs.shape[1]
-                assert qs.shape[1] % self._row_len == 0
+                assert len(qs) == len(ks) == len(vs)
+                assert len(qs) % self._row_len == 0
+                qs = tc.stack(qs, dim=1)
+                ks = tc.stack(ks, dim=1)
+                vs = tc.stack(vs, dim=1)
 
                 batch_size = qs.shape[0]
                 n_rows = qs.shape[1] // self._row_len
@@ -301,11 +323,15 @@ class MultiheadSelfAttention(tc.nn.Module):
         qkv = self._qkv_linear(x)
         qs, ks, vs = tc.chunk(qkv, 3, dim=-1)
 
+        # unbind for efficient new_kvs append op
+        qs, ks, vs = list(map(lambda x: list(tc.unbind(x, dim=1)), [qs, ks, vs]))
         if past_kvs is not None:
-            past_ks, past_vs = tc.chunk(past_kvs, 2, dim=-1)
-            ks = tc.cat((past_ks, ks), dim=1)
-            vs = tc.cat((past_vs, vs), dim=1)
-        new_kvs = tc.cat((ks, vs), dim=-1)  # [B, T1+T2, H*F*2]
+            past_ks, past_vs = past_kvs
+            past_ks.extend(ks)
+            past_vs.extend(vs)
+            ks = past_ks
+            vs = past_vs
+        new_kvs = (ks, vs)  # [B, T1+T2, H*F]
 
         qs, ks, vs, bsp = self.attn_preop(qs, ks, vs, sampling)  # [B', ..., H*F]
         qs, ks, vs = list(map(self.split_heads, [qs, ks, vs]))   # [B'*H, ..., F]
