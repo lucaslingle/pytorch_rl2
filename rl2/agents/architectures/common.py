@@ -166,9 +166,10 @@ class MultiheadSelfAttention(tc.nn.Module):
         if self._attention_style == 'row':
             if sampling:
                 assert len(qs) == 1
-                mod = len(ks) % self._row_len
-                ks = ks[-mod:]  # get relevant row
-                vs = vs[-mod:]
+                row_idx = (len(ks)-1) // self._row_len
+                row_flat_idx = row_idx * self._row_len
+                ks = ks[row_flat_idx:]  # get relevant row
+                vs = vs[row_flat_idx:]
                 qs = tc.stack(qs, dim=1)
                 ks = tc.stack(ks, dim=1)
                 vs = tc.stack(vs, dim=1)
