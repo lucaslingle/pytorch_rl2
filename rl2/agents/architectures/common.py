@@ -230,9 +230,9 @@ class MultiheadSelfAttention(tc.nn.Module):
         if self._attention_style == 'column':
             if sampling:
                 assert len(qs) == 1
-                mod = (len(ks)-1) % self._row_len
-                ks = ks[mod::self._row_len]  # get relevant column
-                vs = vs[mod::self._row_len]
+                column_flat_idx = (len(ks)-1) % self._row_len
+                ks = ks[column_flat_idx::self._row_len]  # get relevant column
+                vs = vs[column_flat_idx::self._row_len]
                 qs = tc.stack(qs, dim=1)
                 ks = tc.stack(ks, dim=1)
                 vs = tc.stack(vs, dim=1)
@@ -350,7 +350,7 @@ class MultiheadSelfAttention(tc.nn.Module):
             rs, u_, v_ = list(map(self.split_heads, [rs, u_, v_]))  # [B'*H, ..., F]
 
             attn_output = relative_masked_self_attention(
-                qs, ks, vs, rs, u_, v_, use_mask=use_mask)   # [B'*H, T2, F]
+                qs, ks, vs, rs, u_, v_, use_mask=use_mask)   # [B'*H, T2', F]
         else:
             attn_output = masked_self_attention(
                 qs, ks, vs, use_mask=use_mask)              # [B'*H, T2', F]

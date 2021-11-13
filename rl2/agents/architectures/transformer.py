@@ -255,7 +255,7 @@ class SparseTransformerXLI(tc.nn.Module):
     def initial_state(self, batch_size):
         return None
 
-    def forward(self, inputs, prev_state):
+    def forward(self, inputs, prev_state=None):
         """
         Args:
             inputs: input vec tensor of shape [B, ..., I]

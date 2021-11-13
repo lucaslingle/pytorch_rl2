@@ -114,17 +114,17 @@ def create_architecture(
     elif architecture == 'trxli':
         return TransformerXLI(
             input_dim=input_dim,
-            n_layer=12,
-            n_head=8,
+            n_layer=6,
+            n_head=2,
             d_model=num_features,
-            d_head=(num_features // 4))
+            d_head=(num_features // 2))
     elif architecture == 'sparse_transformer':
         return SparseTransformerXLI(
             input_dim=input_dim,
-            n_layer=12,
-            n_head=8,
+            n_layer=6,
+            n_head=2,
             d_model=num_features,
-            d_head=(num_features // 4),
+            d_head=(num_features // 2),
             n_context=context_size)
     else:
         raise NotImplementedError
