@@ -270,5 +270,5 @@ def training_loop(
             print("-" * 100)
             print(f"mean meta-episode return: {np.mean(meta_ep_returns):>0.3f}")
             print("-" * 100)
-            policy_checkpoint_fn(pol_iter)
-            value_checkpoint_fn(pol_iter)
+            policy_checkpoint_fn(pol_iter + 1)
+            value_checkpoint_fn(pol_iter + 1)
