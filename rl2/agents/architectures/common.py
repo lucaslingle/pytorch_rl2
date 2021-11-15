@@ -47,18 +47,17 @@ def get_mask(dest_len, src_len):
     return m.int()
 
 
-def masked_self_attention(q, k, v, use_mask=True):
-    scores = tc.bmm(q, k.permute(0, 2, 1))
-    scores /= q.shape[-1] ** 0.5
+def masked_self_attention(qs, ks, vs, use_mask=True):
+    scores = tc.bmm(qs, ks.permute(0, 2, 1))
+    scores /= qs.shape[-1] ** 0.5
 
     if use_mask:
-        mask = get_mask(dest_len=q.shape[1], src_len=k.shape[1])
+        mask = get_mask(dest_len=qs.shape[1], src_len=ks.shape[1])
         mask = mask.view(1, *mask.shape)
         scores = scores * mask - 1e10 * (1 - mask)
 
-    w = tc.nn.Softmax(dim=-1)(scores)  # [-1, T2, T1+T2]
-
-    output = tc.bmm(w, v)
+    ws = tc.nn.Softmax(dim=-1)(scores)
+    output = tc.bmm(ws, vs)
     return output
 
 
