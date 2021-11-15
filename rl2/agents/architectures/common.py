@@ -63,8 +63,7 @@ def masked_self_attention(q, k, v, use_mask=True):
 
 def rel_shift(inputs):
     # inputs should be a 3d tensor with shape [B, T2, T1+T2]
-    # this function implements the part of the shift from Dai et al., Appdx B,
-    # but must be combined with subsequent causal masking to have correct effect
+    # this function implements the part of the shift from Dai et al., Appdx B
     input_shape = inputs.shape
     zp = tc.zeros(size=(input_shape[0], input_shape[1], 1), dtype=tc.float32)
     inputs = tc.cat((zp, inputs), dim=2)
@@ -83,15 +82,14 @@ def relative_masked_self_attention(qs, ks, vs, rs, u_, v_, use_mask=True):
     bd_qs = qs + v_.unsqueeze(1)
     ac = tc.bmm(ac_qs, ks.permute(0, 2, 1))
     bd = tc.bmm(bd_qs, rs.permute(0, 2, 1))
+    bd = rel_shift(bd)
+
+    bd = bd[:, :, 0:ks.shape[1]]  # this is a no-op unless prev row attn is used
+    scores = ac + bd
+    scores /= qs.shape[-1] ** 0.5
 
     if use_mask:
-        bd = rel_shift(bd)
-        scores = ac + bd
-        scores /= qs.shape[-1] ** 0.5
         scores = scores * mask - 1e10 * (1 - mask)
-    else:
-        scores = ac + bd
-        scores /= qs.shape[-1] ** 0.5
 
     ws = tc.nn.Softmax(dim=-1)(scores)
     output = tc.bmm(ws, vs)
@@ -339,11 +337,16 @@ class MultiheadSelfAttention(tc.nn.Module):
 
         if self._position_encoding_style == 'rel':
             batch_size, src_len, d_model = bsp, ks.shape[1], inputs.shape[-1]
-            r_mat = tc.flip(
-                sinusoidal_embeddings(src_len, d_model), dims=(0,))    # [(T1+T2)', I]
-            rs = self._r_linear(r_mat)                                 # [(T1+T2)', H*F]
 
-            rs = tc.tile(rs.unsqueeze(0), [batch_size, 1, 1])    # [B', (T1+T2)', H*F]
+            max_dist = src_len
+            if self._attention_style == 'previous_row':
+                max_dist += qs.shape[1]
+
+            r_mat = tc.flip(
+                sinusoidal_embeddings(max_dist, d_model), dims=(0,))  # [M, I]
+            rs = self._r_linear(r_mat)                                # [M, H*F]
+
+            rs = tc.tile(rs.unsqueeze(0), [batch_size, 1, 1])    # [B', M, H*F]
             u_ = tc.tile(self._u.unsqueeze(0), [batch_size, 1])  # [B', H*F]
             v_ = tc.tile(self._v.unsqueeze(0), [batch_size, 1])  # [B', H*F]
 
