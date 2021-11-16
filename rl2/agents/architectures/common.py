@@ -337,13 +337,13 @@ class MultiheadSelfAttention(tc.nn.Module):
         if self._position_encoding_style == 'rel':
             batch_size, src_len, d_model = bsp, ks.shape[1], inputs.shape[-1]
 
-            max_dist = src_len
+            max_len = src_len
             if self._attention_style == 'previous_row':
-                max_dist += qs.shape[1]
+                max_len += qs.shape[1]
 
             r_mat = tc.flip(
-                sinusoidal_embeddings(max_dist, d_model), dims=(0,))  # [M, I]
-            rs = self._r_linear(r_mat)                                # [M, H*F]
+                sinusoidal_embeddings(max_len, d_model), dims=(0,))  # [M, I]
+            rs = self._r_linear(r_mat)                               # [M, H*F]
 
             rs = tc.tile(rs.unsqueeze(0), [batch_size, 1, 1])    # [B', M, H*F]
             u_ = tc.tile(self._u.unsqueeze(0), [batch_size, 1])  # [B', H*F]
