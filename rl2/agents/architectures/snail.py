@@ -242,6 +242,15 @@ class SNAIL(tc.nn.Module):
             tc2_out = self._tc2(inputs=tc1_out, past_inputs=None)
             attn_out, new_attn_kv = self._attn(inputs=tc2_out, past_kvs=None)
 
+            # TODO(lucaslingle):
+            #  ugly, all due to overhauling attn code;
+            #  added this for compatibility.
+            #  fix uglyness later by adding support for tensor-typed new_kvs
+            #  back to multiheadselfattention, make it optional this time.
+            new_ks, new_vs = new_attn_kv
+            new_ks, new_vs = tc.stack(new_ks, dim=1), tc.stack(new_vs, dim=1)
+            new_attn_kv = tc.cat((new_ks, new_vs), dim=-1)
+
             features = attn_out
             new_state = tc.cat((tc2_out, new_attn_kv), dim=-1)
 
@@ -256,10 +265,22 @@ class SNAIL(tc.nn.Module):
         tc2_out = self._tc2(
             inputs=tc1_out, past_inputs=prev_state[:, :, 0:self._tc2_output_dim])
 
-        attn_out, new_attn_kv = self._attn(
-            inputs=tc2_out, past_kvs=prev_state[:, :, self._tc2_output_dim:])
+        # TODO(lucaslingle): see above todo
+        past_kvs = prev_state[:, :, self._tc2_output_dim:]
+        past_ks, past_vs = tc.chunk(past_kvs, 2, dim=-1)
+        past_ks, past_vs = list(map(
+            lambda x: list(tc.unbind(x, dim=1)), [past_ks, past_vs]))
+        past_kvs = (past_ks, past_vs)
 
+        attn_out, new_attn_kv = self._attn(
+            inputs=tc2_out, past_kvs=past_kvs)
+
+        # TODO(lucaslingle): see above todo
+        new_ks, new_vs = new_attn_kv
+        new_ks, new_vs = tc.stack(new_ks, dim=1), tc.stack(new_vs, dim=1)
+        new_attn_kv = tc.cat((new_ks, new_vs), dim=-1)
         new_attn_kv = new_attn_kv[:, -tc2_out.shape[1]:, :]
+
         features = attn_out
         new_state = tc.cat(
             (prev_state, tc.cat((tc2_out, new_attn_kv), dim=-1)),

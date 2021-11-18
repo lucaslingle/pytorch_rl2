@@ -92,7 +92,7 @@ class LSTM(tc.nn.Module):
             i = tc.nn.Sigmoid()(i)
             o = tc.nn.Sigmoid()(o)
             j = tc.nn.ReLU()(j)
-            c_new = f * c_prev + tc.min(1-f, i) * j
+            c_new = f * c_prev + i * j
             h_new = o * c_new
 
             features_by_timestep.append(h_new)
