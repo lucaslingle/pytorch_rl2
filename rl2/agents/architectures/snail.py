@@ -245,7 +245,7 @@ class SNAIL(tc.nn.Module):
             # TODO(lucaslingle):
             #  ugly, all due to overhauling attn code;
             #  added this for compatibility.
-            #  fix ugliness later by adding support for tensor-typed new_kvs
+            #  fix later by adding support for tensor-typed new_kvs
             #  back to multiheadselfattention, make it optional this time.
             new_ks, new_vs = new_attn_kv
             new_ks, new_vs = tc.stack(new_ks, dim=1), tc.stack(new_vs, dim=1)
