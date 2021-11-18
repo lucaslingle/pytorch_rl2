@@ -3,6 +3,8 @@ Implements common agent components used in Duan et al., 2016
 - 'RL^2 : Fast Reinforcement Learning via Slow Reinforcement Learning'.
 """
 
+import functools
+
 import torch as tc
 
 
@@ -32,14 +34,18 @@ class LayerNorm(tc.nn.Module):
         return scaled
 
 
-def sinusoidal_embeddings(src_len, d_model):
+@functools.lru_cache
+def sinusoidal_embeddings(src_len, d_model, reverse=False):
     pos_seq = tc.arange(src_len)
     inv_freq = 1 / (10000 ** (tc.arange(0, d_model, 2) / d_model))
     sinusoid_input = pos_seq.view(-1, 1) * inv_freq.view(1, -1)
     pos_emb = tc.cat((tc.sin(sinusoid_input), tc.cos(sinusoid_input)), dim=-1)
+    if reverse:
+        pos_emb = tc.flip(pos_emb, dims=(0,))
     return pos_emb
 
 
+@functools.lru_cache
 def get_mask(dest_len, src_len):
     i = tc.arange(dest_len).view(dest_len, 1)
     j = tc.arange(src_len).view(1, src_len)
@@ -341,9 +347,8 @@ class MultiheadSelfAttention(tc.nn.Module):
             if self._attention_style == 'previous_row':
                 max_len += qs.shape[1]
 
-            r_mat = tc.flip(
-                sinusoidal_embeddings(max_len, d_model), dims=(0,))  # [M, I]
-            rs = self._r_linear(r_mat)                               # [M, H*F]
+            r_mat = sinusoidal_embeddings(max_len, d_model, reverse=True)  # [M, I]
+            rs = self._r_linear(r_mat)                                     # [M, H*F]
 
             rs = tc.tile(rs.unsqueeze(0), [batch_size, 1, 1])    # [B', M, H*F]
             u_ = tc.tile(self._u.unsqueeze(0), [batch_size, 1])  # [B', H*F]
