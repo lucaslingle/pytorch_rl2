@@ -219,7 +219,7 @@ class SNAIL(tc.nn.Module):
     def output_dim(self):
         return self._tc2.output_dim + self._feature_dim
 
-    def forward(self, inputs, prev_state):
+    def forward(self, inputs, prev_state=None):
         """
         Run state update, compute features.
 
