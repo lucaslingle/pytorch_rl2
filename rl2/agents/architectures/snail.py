@@ -157,11 +157,15 @@ class TCBlock(tc.nn.Module):
     def output_dim(self):
         return self._inputs_size + self.num_layers * self._feature_dim
 
+    @property
+    def state_dim(self):
+        return self.output_dim - self._feature_dim
+
     def forward(self, inputs, past_inputs=None):
         """
         Args:
             inputs: inputs tensor of shape [B, T2, I]
-            past_inputs: optional past inputs tensor of shape [B, T1, I+L*F]
+            past_inputs: optional past inputs tensor of shape [B, T1, I+(L-1)*F]
 
         Returns:
             tensor of shape [B, T2, I+L*F]
@@ -215,11 +219,7 @@ class SNAIL(tc.nn.Module):
     def output_dim(self):
         return self._tc2.output_dim + self._feature_dim
 
-    def forward(
-        self,
-        inputs: tc.FloatTensor,
-        prev_state: Optional[tc.FloatTensor]
-    ) -> Tuple[tc.FloatTensor, tc.FloatTensor]:
+    def forward(self, inputs, prev_state):
         """
         Run state update, compute features.
 
@@ -251,10 +251,10 @@ class SNAIL(tc.nn.Module):
             return features, new_state
 
         tc1_out = self._tc1(
-            inputs=inputs, past_inputs=prev_state[0][:, :, 0:self._tc1.output_dim])
+            inputs=inputs, past_inputs=prev_state[0][:, :, 0:self._tc1.state_dim])
 
         tc2_out = self._tc2(
-            inputs=tc1_out, past_inputs=prev_state[0][:, :, 0:self._tc2.output_dim])
+            inputs=tc1_out, past_inputs=prev_state[0][:, :, 0:self._tc2.state_dim])
 
         attn_out, new_attn_kv = self._attn(
             inputs=tc2_out, past_kvs=prev_state[1])
