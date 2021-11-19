@@ -3,6 +3,7 @@ Implements SNAIL architecture (Mishra et al., 2017) for RL^2.
 """
 
 from typing import Optional, Tuple
+from collections import namedtuple
 
 import torch as tc
 import numpy as np
@@ -152,6 +153,10 @@ class TCBlock(tc.nn.Module):
         log2_context_size = np.log(self._context_size) / np.log(2)
         return int(np.ceil(log2_context_size))
 
+    @property
+    def output_dim(self):
+        return self._inputs_size + self.num_layers * self._feature_dim
+
     def forward(self, inputs, past_inputs=None):
         """
         Args:
@@ -188,19 +193,14 @@ class SNAIL(tc.nn.Module):
             context_size=self._context_size,
             use_ln=self._use_ln)
 
-        self._tc1_output_dim = self._input_dim + \
-                               self._tc1.num_layers * self._feature_dim
         self._tc2 = TCBlock(
-            input_dim=self._tc1_output_dim,
+            input_dim=self._tc1.output_dim,
             feature_dim=self._feature_dim,
             context_size=self._context_size,
             use_ln=self._use_ln)
 
-        self._tc2_output_dim = self._input_dim + \
-                               self._tc1.num_layers * self._feature_dim + \
-                               self._tc2.num_layers * self._feature_dim
         self._attn = MultiheadSelfAttention(
-            input_dim=self._tc2_output_dim,
+            input_dim=self._tc2.output_dim,
             num_heads=1,
             num_head_features=self._feature_dim,
             position_encoding_style='abs',
@@ -251,10 +251,10 @@ class SNAIL(tc.nn.Module):
             return features, new_state
 
         tc1_out = self._tc1(
-            inputs=inputs, past_inputs=prev_state[0][:, :, 0:self._tc1_output_dim])
+            inputs=inputs, past_inputs=prev_state[0][:, :, 0:self._tc1.output_dim])
 
         tc2_out = self._tc2(
-            inputs=tc1_out, past_inputs=prev_state[0][:, :, 0:self._tc2_output_dim])
+            inputs=tc1_out, past_inputs=prev_state[0][:, :, 0:self._tc2.output_dim])
 
         attn_out, new_attn_kv = self._attn(
             inputs=tc2_out, past_kvs=prev_state[1])
