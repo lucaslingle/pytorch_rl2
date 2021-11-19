@@ -61,26 +61,25 @@ class CausalConv(tc.nn.Module):
         effective_kernel_size = self.effective_kernel_size
 
         if past_inputs is not None:
-            t1 = list(past_inputs.shape)[1]
+            t1 = past_inputs.shape[1]
             if t1 < effective_kernel_size - 1:
                 zpl = (effective_kernel_size - 1) - t1
                 zps = (batch_size, zpl, self._input_dim)
                 zp = tc.zeros(size=zps, dtype=tc.float32)
-                inputs = tc.cat((zp, past_inputs, inputs), dim=1)
+                left_padded_inputs = tc.cat((zp, past_inputs, inputs), dim=1)
             elif t1 > effective_kernel_size - 1:
-                inputs = tc.cat(
-                    (past_inputs[:, -(effective_kernel_size - 1):], inputs),
-                    dim=1
-                )
+                crop_len = effective_kernel_size - 1
+                cropped_past_inputs = past_inputs[:, -crop_len:, :]
+                left_padded_inputs = tc.cat((cropped_past_inputs, inputs), dim=1)
             else:
-                inputs = tc.cat((past_inputs, inputs), dim=1)
+                left_padded_inputs = tc.cat((past_inputs, inputs), dim=1)
         else:
             zpl = (effective_kernel_size - 1)
             zps = (batch_size, zpl, self._input_dim)
             zp = tc.zeros(size=zps, dtype=tc.float32)
-            inputs = tc.cat((zp, inputs), dim=1)
+            left_padded_inputs = tc.cat((zp, inputs), dim=1)
 
-        conv = self._conv(inputs.permute(0, 2, 1)).permute(0, 2, 1)
+        conv = self._conv(left_padded_inputs.permute(0, 2, 1)).permute(0, 2, 1)
         return conv
 
 
