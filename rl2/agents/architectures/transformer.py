@@ -190,8 +190,6 @@ class TransformerXLI(tc.nn.Module):
             for _ in range(0, self._n_layer)
         ])
 
-        self._ln = LayerNorm(units=self._d_model)
-
     @property
     def output_dim(self):
         return self._d_model
@@ -227,7 +225,7 @@ class TransformerXLI(tc.nn.Module):
                 inputs=inputs, past_kvs=past_kvs[l])
             new_kvs_by_layer.append(new_kvs)
 
-        features = self._ln(inputs)
+        features = inputs
 
         if features.shape[1] == 1:
             features = features.squeeze(1)
@@ -268,8 +266,6 @@ class SparseTransformerXLI(tc.nn.Module):
                 row_len=self._row_len)
             for l in range(0, self._n_layer)
         ])
-
-        self._ln = LayerNorm(units=self._d_model)
 
     @property
     def _row_len(self):
@@ -315,7 +311,7 @@ class SparseTransformerXLI(tc.nn.Module):
                 inputs=inputs, past_kvs=past_kvs[l])
             new_kvs_by_layer.append(new_kvs)
 
-        features = self._ln(inputs)
+        features = inputs
 
         if features.shape[1] == 1:
             features = features.squeeze(1)
