@@ -425,8 +425,7 @@ class DCSparseTransformerXL(tc.nn.Module):
         self._input_proj = tc.nn.Sequential(
             tc.nn.Linear(
                 in_features=self._input_dim,
-                out_features=self._feature_dim,
-                bias=True),
+                out_features=self._feature_dim),
             LayerNorm(units=self._feature_dim),
             tc.nn.ReLU()
         )
