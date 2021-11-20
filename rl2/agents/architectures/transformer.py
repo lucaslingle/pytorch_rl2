@@ -33,7 +33,7 @@ class FF(tc.nn.Module):
             in_features=self._hidden_dim,
             out_features=self._output_dim,
             bias=True)
-        tc.nn.init.xavier_normal_(self._lin2.weight)
+        tc.nn.init.zeros_(self._lin2.weight)
         tc.nn.init.zeros_(self._lin2.bias)
 
     def forward(self, inputs):
@@ -112,7 +112,7 @@ class TransformerLayer(tc.nn.Module):
             in_features=(self._n_head * self._d_head),
             out_features=self._d_model,
             bias=False)
-        tc.nn.init.xavier_normal_(self._proj.weight)
+        tc.nn.init.zeros_(self._proj.weight)
 
         self._ff = FF(
             input_dim=self._d_model,
