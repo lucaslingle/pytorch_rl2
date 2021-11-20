@@ -130,6 +130,8 @@ class TransformerLayer(tc.nn.Module):
             and new_kvs tensor of shape [B, T1+T2, H*F*2]
         """
         x = inputs
+
+        i = inputs
         for letter in self._layer_ordering:
             if letter == 'a':
                 x = self._attn_act(x)
@@ -138,10 +140,11 @@ class TransformerLayer(tc.nn.Module):
             elif letter == 'f':
                 attn_output, new_kvs = self._attn(x, past_kvs=past_kvs)
                 attn_output = self._proj(attn_output)
-                x = x + attn_output
+                x = i + attn_output
             else:
                 raise NotImplementedError
 
+        i = x
         for letter in self._layer_ordering:
             if letter == 'a':
                 x = self._ff_act(x)
@@ -149,7 +152,7 @@ class TransformerLayer(tc.nn.Module):
                 x = self._ff_layer_norm(x)
             elif letter == 'f':
                 ff_output = self._ff(x)
-                x = x + ff_output
+                x = i + ff_output
             else:
                 raise NotImplementedError
 
