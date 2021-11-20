@@ -109,14 +109,10 @@ class MultiheadSelfAttention(tc.nn.Module):
             num_head_features,
             position_encoding_style,
             attention_style,
-            connection_style,
-            activation=None,
-            use_ln=True,
             row_len=None
     ):
         assert position_encoding_style in ['abs', 'rel']
         assert attention_style in ['full', 'row', 'previous_row', 'column']
-        assert connection_style in ['plain', 'residual', 'dense']
         assert attention_style == 'full' or row_len is not None
 
         super().__init__()
@@ -125,13 +121,7 @@ class MultiheadSelfAttention(tc.nn.Module):
         self._num_head_features = num_head_features
         self._position_encoding_style = position_encoding_style
         self._attention_style = attention_style
-        self._connection_style = connection_style
-        self._activation = activation
-        self._use_ln = use_ln
         self._row_len = row_len
-
-        if self._use_ln:
-            self._ln = LayerNorm(units=self._input_dim)
 
         self._qkv_linear = tc.nn.Linear(
             in_features=self._input_dim,
@@ -151,13 +141,6 @@ class MultiheadSelfAttention(tc.nn.Module):
             self._v = tc.nn.Parameter(
                 tc.zeros(size=(self._num_heads * self._num_head_features,),
                          dtype=tc.float32))
-
-        if self._connection_style == 'residual':
-            self._proj_linear = tc.nn.Linear(
-                in_features=(self._num_heads * self._num_head_features),
-                out_features=input_dim,
-                bias=False)
-            tc.nn.init.xavier_normal_(self._proj_linear.weight)
 
     def attn_preop(self, qs, ks, vs, sampling):
         if self._attention_style == 'full':
@@ -320,11 +303,7 @@ class MultiheadSelfAttention(tc.nn.Module):
         sampling = (inputs.shape[1] == 1)
         use_mask = (self._attention_style != 'previous_row')
 
-        x = inputs
-        if self._use_ln:
-            x = self._ln(x)
-
-        qkv = self._qkv_linear(x)
+        qkv = self._qkv_linear(inputs)
         qs, ks, vs = tc.chunk(qkv, 3, dim=-1)
 
         # unbind for efficient new_kvs append op
@@ -368,19 +347,4 @@ class MultiheadSelfAttention(tc.nn.Module):
             input_len=inputs.shape[1],
             sampling=sampling)  # [B, T2, H*F]
 
-        if self._connection_style == 'residual':
-            attn_output = self._proj_linear(attn_output)
-
-        if self._activation is not None:
-            attn_output = self._activation(attn_output)
-
-        if self._connection_style == 'plain':
-            output = attn_output
-        elif self._connection_style == 'residual':
-            output = inputs + attn_output
-        elif self._connection_style == 'dense':
-            output = tc.cat((inputs, attn_output), dim=-1)
-        else:
-            raise NotImplementedError
-
-        return output, new_kvs
+        return attn_output, new_kvs

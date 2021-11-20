@@ -2,8 +2,7 @@
 Implements SNAIL architecture (Mishra et al., 2017) for RL^2.
 """
 
-from typing import Optional, Tuple
-from collections import namedtuple
+from typing import Optional
 
 import torch as tc
 import numpy as np
@@ -205,16 +204,14 @@ class SNAIL(tc.nn.Module):
             num_heads=1,
             num_head_features=self._feature_dim,
             position_encoding_style='abs',
-            attention_style='full',
-            connection_style='dense',
-            use_ln=False)
-
-    def initial_state(self, batch_size: int) -> None:
-        return None
+            attention_style='full')
 
     @property
     def output_dim(self):
         return self._tc2.output_dim + self._feature_dim
+
+    def initial_state(self, batch_size: int) -> None:
+        return None
 
     def forward(self, inputs, prev_state=None):
         """
@@ -248,7 +245,7 @@ class SNAIL(tc.nn.Module):
             attn_out, new_attn_kv = self._attn(
                 inputs=tc2_out, past_kvs=prev_state[1])
 
-        features = attn_out
+        features = tc.cat((tc2_out, attn_out), dim=-1)
         new_state = (tc2_out, new_attn_kv)
 
         if features.shape[1] == 1:

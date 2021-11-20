@@ -2,7 +2,7 @@
 Implements Transformer architectures for RL^2.
 """
 
-from typing import List, Tuple
+from typing import Optional
 import math
 
 import torch as tc
@@ -15,26 +15,12 @@ class FF(tc.nn.Module):
             self,
             input_dim,
             hidden_dim,
-            output_dim,
-            connection_style,
-            hidden_activation=tc.nn.ReLU(),
-            output_activation=None,
-            use_ln=True
+            output_dim
     ):
-        assert connection_style in ['plain', 'residual', 'dense']
-        assert input_dim == output_dim or connection_style != 'residual'
         super().__init__()
-
         self._input_dim = input_dim
         self._hidden_dim = hidden_dim
         self._output_dim = output_dim
-        self._hidden_activation = hidden_activation
-        self._output_activation = output_activation
-        self._connection_style = connection_style
-        self._use_ln = use_ln
-
-        if self._use_ln:
-            self._ln = LayerNorm(units=input_dim)
 
         self._lin1 = tc.nn.Linear(
             in_features=self._input_dim,
@@ -56,67 +42,82 @@ class FF(tc.nn.Module):
             inputs: input vec tensor of shape [B, T2, I]
 
         Returns:
-            output tensor of shape [B, T2, O] with output dim O
-            determined by self._connection_style
+            output tensor of shape [B, T2, O]
         """
         x = inputs
-        if self._use_ln:
-            x = self._ln(x)
-
         x = self._lin1(x)
-        x = self._hidden_activation(x)
+        x = tc.nn.ReLU()(x)
         x = self._lin2(x)
-        if self._output_activation is not None:
-            x = self._output_activation(x)
-
-        if self._connection_style == 'plain':
-            return x
-        elif self._connection_style == 'residual':
-            return inputs + x
-        elif self._connection_style == 'dense':
-            return tc.cat((inputs, x), dim=-1)
-        else:
-            raise NotImplementedError
+        return x
 
 
-class TransformerXLILayer(tc.nn.Module):
+class TransformerLayer(tc.nn.Module):
     def __init__(
             self,
-            d_model,
-            n_head,
-            d_head,
-            d_ff,
-            attention_style,
-            row_len=None
+            d_model: int,
+            n_head: int,
+            d_head: int,
+            d_ff: int,
+            position_encoding_style: str,
+            attention_style: str,
+            layer_ordering: str,
+            row_len: Optional[int] = None
     ):
+        """
+        Args:
+            d_model: dimensionality of model features.
+            n_head: number of attention heads
+            d_head: dimensionality of attention head.
+            d_ff: dimensionality of inner layer of feedforward neural network.
+            position_encoding_style: one of 'abs', 'rel'.
+            attention_style: one of 'full', 'row', 'column', or 'previous_row'.
+            layer_ordering: ordering of activation, function, and normalization.
+                should be the letters chosen from 'a', 'f', 'n' in any order.
+                letter 'f' cannot be omitted.
+            row_len: required if attention_style is not 'full'
+        """
         assert attention_style == 'full' or row_len is not None
+        letters = set(list(layer_ordering))
+        assert len(letters) <= 3
+        assert 'f' in letters
+        assert letters <= {'a', 'f', 'n'}
+
         super().__init__()
         self._d_model = d_model
         self._n_head = n_head
         self._d_head = d_head
         self._d_ff = d_ff
+        self._position_encoding_style = position_encoding_style
         self._attention_style = attention_style
+        self._layer_ordering = list(layer_ordering)
         self._row_len = row_len
+
+        if 'a' in self._layer_ordering:
+            self._attn_act = tc.nn.ReLU()
+            self._ff_act = tc.nn.ReLU()
+
+        if 'n' in self._layer_ordering:
+            self._attn_layer_norm = LayerNorm(units=self._d_model)
+            self._ff_layer_norm = LayerNorm(units=self._d_model)
 
         self._attn = MultiheadSelfAttention(
             input_dim=self._d_model,
             num_heads=self._n_head,
             num_head_features=self._d_head,
-            position_encoding_style='rel',
+            position_encoding_style=self._position_encoding_style,
             attention_style=self._attention_style,
-            connection_style='residual',
-            activation=tc.nn.ReLU(),
-            use_ln=True,
             row_len=self._row_len)
+
+        self._proj = tc.nn.Linear(
+            in_features=(self._n_head * self._d_head),
+            out_features=self._d_model,
+            bias=False)
+        tc.nn.init.xavier_normal_(self._proj.weight)
 
         self._ff = FF(
             input_dim=self._d_model,
             hidden_dim=self._d_ff,
-            output_dim=self._d_model,
-            connection_style='residual',
-            hidden_activation=tc.nn.ReLU(),
-            output_activation=tc.nn.ReLU(),
-            use_ln=True)
+            output_dim=self._d_model)
 
     def forward(self, inputs, past_kvs=None):
         """
@@ -128,10 +129,31 @@ class TransformerXLILayer(tc.nn.Module):
             output tensor of shape [B, T2, I]
             and new_kvs tensor of shape [B, T1+T2, H*F*2]
         """
-        attn_output, new_kvs = self._attn(inputs=inputs, past_kvs=past_kvs)
-        ff_output = self._ff(inputs=attn_output)
+        x = inputs
+        for letter in self._layer_ordering:
+            if letter == 'a':
+                x = self._attn_act(x)
+            elif letter == 'n':
+                x = self._attn_layer_norm(x)
+            elif letter == 'f':
+                attn_output, new_kvs = self._attn(x, past_kvs=past_kvs)
+                attn_output = self._proj(attn_output)
+                x = x + attn_output
+            else:
+                raise NotImplementedError
 
-        return ff_output, new_kvs
+        for letter in self._layer_ordering:
+            if letter == 'a':
+                x = self._ff_act(x)
+            elif letter == 'n':
+                x = self._ff_layer_norm(x)
+            elif letter == 'f':
+                ff_output = self._ff(x)
+                x = x + ff_output
+            else:
+                raise NotImplementedError
+
+        return x, new_kvs
 
 
 class TransformerXLI(tc.nn.Module):
@@ -147,16 +169,18 @@ class TransformerXLI(tc.nn.Module):
         self._d_head = d_head
 
         self._lin = tc.nn.Linear(
-            self._input_dim, self._d_model, bias=False)
+            self._input_dim, self._d_model)
         tc.nn.init.xavier_normal_(self._lin.weight)
 
         self._transformer_layers = tc.nn.ModuleList([
-            TransformerXLILayer(
+            TransformerLayer(
                 d_model=self._d_model,
                 n_head=self._n_head,
                 d_head=self._d_head,
                 d_ff=self._d_model,
-                attention_style='full')
+                position_encoding_style='rel',
+                attention_style='full',
+                layer_ordering='nfa')
             for _ in range(0, self._n_layer)
         ])
 
@@ -227,12 +251,14 @@ class SparseTransformerXLI(tc.nn.Module):
         tc.nn.init.xavier_normal_(self._lin.weight)
 
         self._transformer_layers = tc.nn.ModuleList([
-            TransformerXLILayer(
+            TransformerLayer(
                 d_model=self._d_model,
                 n_head=self._n_head,
                 d_head=self._d_head,
                 d_ff=self._d_model,
+                position_encoding_style='rel',
                 attention_style=self._attention_styles[l % 3],
+                layer_ordering='nfa',
                 row_len=self._row_len)
             for l in range(0, self._n_layer)
         ])
