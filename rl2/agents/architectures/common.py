@@ -293,11 +293,10 @@ class MultiheadSelfAttention(tc.nn.Module):
         """
         Args:
             inputs: present input tensor with shape [B, T2, I]
-            past_kvs: optional past kvs with shape [B, T1, H*F*2]
+            past_kvs: optional past kvs
 
         Returns:
-            output tensor with shape determined by self._connection_style
-            and new_kvs tensor of shape [B, T1+T2, H*F*2]
+            output tensor and new kvs
         """
         assert inputs.shape[-1] == self._input_dim
         sampling = (inputs.shape[1] == 1)
