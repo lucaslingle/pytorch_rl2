@@ -161,7 +161,10 @@ class TransformerLayer(tc.nn.Module):
 
 class TransformerXLI(tc.nn.Module):
     """
-    Implements the Transformer XL-I from Parisotto et al., 2019.
+    Implements a variant of Transformer XL-I from Parisotto et al., 2019.
+
+    Note we place the relu after the residual sum, which allows positive coordinates
+    of the feature vector to increase as well as decrease.
     """
     def __init__(self, input_dim, n_layer, n_head, d_model, d_head):
         super().__init__()
