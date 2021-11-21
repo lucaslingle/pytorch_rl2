@@ -656,8 +656,7 @@ class NeoTransformer(tc.nn.Module):
         # input
         self._input_proj = tc.nn.Linear(
             in_features=self._input_dim,
-            out_features=self._feature_dim,
-            bias=False)
+            out_features=self._feature_dim)
         tc.nn.init.xavier_normal_(self._input_proj.weight)
         if 'n' in self._layer_ordering:
             if self._layer_ordering.index('f') < self._layer_ordering.index('n'):
