@@ -776,3 +776,12 @@ class NeoTransformer(tc.nn.Module):
             features = features.squeeze(1)
 
         return features, new_kvs_by_layer
+
+
+# TODO(lucaslingle):
+#  (1) create TransformerXLI, SparseTransformerXLI, EfficientTransformerXL classes
+#  by extending NeoTransformer and passing in the relevant arguments to super init.
+#  (2) Test everything
+#  (3) Once you've tested everything, get rid of all the other transformers
+#  and the old transformer layer, dctransformerlayer, etc.
+#  and rename NeoTransformerLayer, NeoTransformer to drop the neo.
