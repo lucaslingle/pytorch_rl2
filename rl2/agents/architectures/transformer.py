@@ -727,8 +727,10 @@ class NeoTransformer(tc.nn.Module):
         Args:
             inputs: input vec tensor of shape [B, ..., I]
             prev_state: optional previous state.
+
          Notes:
             '...' must be either one dimensional or must not exist
+
         Returns:
             output feature tensor and new state.
         """
@@ -744,13 +746,9 @@ class NeoTransformer(tc.nn.Module):
             if letter == 'n':
                 if self._layer_ordering.index('n') > self._layer_ordering.index('f'):
                     inputs = self._input_layer_norm(inputs)
-                else:
-                    continue
             elif letter == 'a':
                 if self._layer_ordering.index('a') > self._layer_ordering.index('f'):
                     inputs = self._input_act(inputs)
-                else:
-                    continue
             else:
                 continue
 
@@ -766,13 +764,9 @@ class NeoTransformer(tc.nn.Module):
             if letter == 'n':
                 if self._layer_ordering.index('n') < self._layer_ordering.index('f'):
                     inputs = self._output_layer_norm(inputs)
-                else:
-                    continue
             elif letter == 'a':
                 if self._layer_ordering.index('a') < self._layer_ordering.index('f'):
                     inputs = self._output_act(inputs)
-                else:
-                    continue
             else:
                 continue
 
