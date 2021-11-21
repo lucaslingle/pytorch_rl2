@@ -143,11 +143,18 @@ class MultiheadSelfAttention(tc.nn.Module):
                          dtype=tc.float32))
 
     def attn_preop(self, qs, ks, vs, sampling):
+        assert type(qs) == type(ks) == type(vs)
+        assert (sampling and type(qs) == list) or \
+               (not sampling and type(qs) == tc.Tensor)
+
         if self._attention_style == 'full':
-            qs = tc.stack(qs, dim=1)
-            ks = tc.stack(ks, dim=1)
-            vs = tc.stack(vs, dim=1)
-            return qs, ks, vs, qs.shape[0]
+            if sampling:
+                qs = tc.stack(qs, dim=1)
+                ks = tc.stack(ks, dim=1)
+                vs = tc.stack(vs, dim=1)
+                return qs, ks, vs, qs.shape[0]
+            else:
+                return qs, ks, vs, qs.shape[0]
 
         if self._attention_style == 'row':
             if sampling:
@@ -161,11 +168,8 @@ class MultiheadSelfAttention(tc.nn.Module):
                 vs = tc.stack(vs, dim=1)
                 return qs, ks, vs, qs.shape[0]
             else:
-                assert len(qs) == len(ks) == len(vs)
-                assert len(qs) % self._row_len == 0
-                qs = tc.stack(qs, dim=1)
-                ks = tc.stack(ks, dim=1)
-                vs = tc.stack(vs, dim=1)
+                assert qs.shape[1] == ks.shape[1] == vs.shape[1]
+                assert qs.shape[1] % self._row_len == 0
                 qs = tc.reshape(qs, [-1, self._row_len, qs.shape[-1]])
                 ks = tc.reshape(ks, [-1, self._row_len, ks.shape[-1]])
                 vs = tc.reshape(vs, [-1, self._row_len, vs.shape[-1]])
@@ -190,27 +194,17 @@ class MultiheadSelfAttention(tc.nn.Module):
                     vs = tc.zeros(size=prev_row_shape, dtype=tc.float32)
                     return qs, ks, vs, qs.shape[0]
             else:
-                assert len(qs) == len(ks) == len(vs)
-                assert len(qs) % self._row_len == 0
-                qs = tc.stack(qs, dim=1)
-                ks = tc.stack(ks, dim=1)
-                vs = tc.stack(vs, dim=1)
-
-                batch_size = qs.shape[0]
+                assert qs.shape[1] == ks.shape[1] == vs.shape[1]
+                assert qs.shape[1] % self._row_len == 0
                 n_rows = qs.shape[1] // self._row_len
-                n_feature = qs.shape[2]
-                block_shape = [batch_size, n_rows, self._row_len, n_feature]
-
-                qs = tc.reshape(qs, block_shape)
-                ks = tc.reshape(ks, block_shape)
-                vs = tc.reshape(vs, block_shape)
-
+                qs = tc.reshape(qs, [-1, n_rows, self._row_len, qs.shape[-1]])
+                ks = tc.reshape(ks, [-1, n_rows, self._row_len, qs.shape[-1]])
+                vs = tc.reshape(vs, [-1, n_rows, self._row_len, qs.shape[-1]])
                 ks = tc.nn.functional.pad(ks[:,:-1,:,:], (0,0,0,0,1,0))
                 vs = tc.nn.functional.pad(vs[:,:-1,:,:], (0,0,0,0,1,0))
-
-                qs = tc.reshape(qs, [-1, self._row_len, n_feature])
-                ks = tc.reshape(ks, [-1, self._row_len, n_feature])
-                vs = tc.reshape(vs, [-1, self._row_len, n_feature])
+                qs = tc.reshape(qs, [-1, self._row_len, qs.shape[-1]])
+                ks = tc.reshape(ks, [-1, self._row_len, ks.shape[-1]])
+                vs = tc.reshape(vs, [-1, self._row_len, vs.shape[-1]])
                 return qs, ks, vs, qs.shape[0]
 
         if self._attention_style == 'column':
@@ -224,28 +218,18 @@ class MultiheadSelfAttention(tc.nn.Module):
                 vs = tc.stack(vs, dim=1)
                 return qs, ks, vs, qs.shape[0]
             else:
-                assert len(qs) == len(ks) == len(vs)
-                assert len(qs) % self._row_len == 0
-                qs = tc.stack(qs, dim=1)
-                ks = tc.stack(ks, dim=1)
-                vs = tc.stack(vs, dim=1)
-
-                batch_size = qs.shape[0]
+                assert qs.shape[1] == ks.shape[1] == vs.shape[1]
+                assert qs.shape[1] % self._row_len == 0
                 n_rows = qs.shape[1] // self._row_len
-                n_feature = qs.shape[2]
-                block_shape = [batch_size, n_rows, self._row_len, n_feature]
-
-                qs = tc.reshape(qs, block_shape)
-                ks = tc.reshape(ks, block_shape)
-                vs = tc.reshape(vs, block_shape)
-
+                qs = tc.reshape(qs, [-1, n_rows, self._row_len, qs.shape[-1]])
+                ks = tc.reshape(ks, [-1, n_rows, self._row_len, qs.shape[-1]])
+                vs = tc.reshape(vs, [-1, n_rows, self._row_len, qs.shape[-1]])
                 qs = qs.permute(0, 2, 1, 3)
                 ks = ks.permute(0, 2, 1, 3)
                 vs = vs.permute(0, 2, 1, 3)
-
-                qs = tc.reshape(qs, [-1, n_rows, n_feature])
-                ks = tc.reshape(ks, [-1, n_rows, n_feature])
-                vs = tc.reshape(vs, [-1, n_rows, n_feature])
+                qs = tc.reshape(qs, [-1, n_rows, qs.shape[-1]])
+                ks = tc.reshape(ks, [-1, n_rows, ks.shape[-1]])
+                vs = tc.reshape(vs, [-1, n_rows, vs.shape[-1]])
                 return qs, ks, vs, qs.shape[0]
 
         raise NotImplementedError
@@ -305,15 +289,21 @@ class MultiheadSelfAttention(tc.nn.Module):
         qkv = self._qkv_linear(inputs)
         qs, ks, vs = tc.chunk(qkv, 3, dim=-1)
 
-        # unbind for efficient new_kvs append op
-        qs, ks, vs = list(map(lambda x: list(tc.unbind(x, dim=1)), [qs, ks, vs]))
+        if sampling:
+            # unbind for efficient new_kvs append op
+            qs, ks, vs = list(map(lambda x: [x.squeeze(1)], [qs, ks, vs]))
+
         if past_kvs is not None:
             past_ks, past_vs = past_kvs
-            past_ks.extend(ks)
-            past_vs.extend(vs)
-            ks = past_ks
-            vs = past_vs
-        new_kvs = (ks, vs)  # [B, T1+T2, H*F]
+            if sampling:
+                past_ks.extend(ks)
+                past_vs.extend(vs)
+                ks = past_ks
+                vs = past_vs
+            else:
+                ks = tc.cat((past_ks, ks), dim=1)
+                vs = tc.cat((past_vs, vs), dim=1)
+        new_kvs = (ks, vs)
 
         qs, ks, vs, bsp = self.attn_preop(qs, ks, vs, sampling)  # [B', ..., H*F]
         qs, ks, vs = list(map(self.split_heads, [qs, ks, vs]))   # [B'*H, ..., F]
