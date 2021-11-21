@@ -779,9 +779,9 @@ class NeoTransformer(tc.nn.Module):
 
 
 # TODO(lucaslingle):
-#  (1) create TransformerXLI, SparseTransformerXLI, EfficientTransformerXL classes
+#  (1) create NeoTransformerXLI, NeoSparseTransformerXLI, NeoEfficientTransformerXL classes
 #  by extending NeoTransformer and passing in the relevant arguments to super init.
 #  (2) Test everything
 #  (3) Once you've tested everything, get rid of all the other transformers
 #  and the old transformer layer, dctransformerlayer, etc.
-#  and rename NeoTransformerLayer, NeoTransformer to drop the neo.
+#  and rename NeoTransformerLayer, NeoTransformer, ... to drop the neo.
