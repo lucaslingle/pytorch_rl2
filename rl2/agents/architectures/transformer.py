@@ -683,7 +683,6 @@ class NeoTransformer(tc.nn.Module):
         if 'n' in self._layer_ordering:
             if self._layer_ordering.index('n') < self._layer_ordering.index('f'):
                self._output_layer_norm = LayerNorm(units=self.output_dim)
-
         if 'a' in self._layer_ordering:
             if self._layer_ordering.index('a') < self._layer_ordering.index('f'):
                self._output_act = tc.nn.ReLU()
