@@ -715,6 +715,17 @@ class NeoTransformer(tc.nn.Module):
         return None
 
     def forward(self, inputs, prev_state=None):
+        """
+        Args:
+            inputs: input vec tensor of shape [B, ..., I]
+            prev_state: optional previous state.
+
+         Notes:
+            '...' must be either one dimensional or must not exist
+
+        Returns:
+            output feature tensor and new state.
+        """
         assert len(list(inputs.shape)) in [2, 3]
         if len(list(inputs.shape)) == 2:
             inputs = inputs.unsqueeze(1)
