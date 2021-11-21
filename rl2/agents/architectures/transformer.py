@@ -516,6 +516,7 @@ class NeoTransformerLayer(tc.nn.Module):
                 letter 'f' cannot be omitted.
             row_len: required if attention_style is not 'full'
         """
+        assert feature_dim % num_heads == 0
         assert position_encoding_style in ['abs', 'rel']
         assert attention_style in ['full', 'row', 'previous_row', 'column']
         assert connection_style in ['plain', 'residual', 'dense']
