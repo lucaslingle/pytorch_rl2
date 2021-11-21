@@ -217,7 +217,6 @@ class Transformer(tc.nn.Module):
         self._n_head = n_head
         self._n_context = n_context
         self._position_encoding_style = position_encoding_style
-        self._attention_styles = self._get_attention_styles(attention_style)
         self._connection_style = connection_style
         self._layer_ordering = list(layer_ordering)
 
