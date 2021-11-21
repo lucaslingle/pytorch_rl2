@@ -82,7 +82,7 @@ class TransformerLayer(tc.nn.Module):
         assert attention_style == 'full' or row_len is not None
         assert len(layer_ordering) == len(set(layer_ordering))
         assert set(layer_ordering) <= {'a', 'f', 'n'}
-        assert 'f' in set(layer_ordering)
+        assert {'f'} <= set(layer_ordering)
 
         super().__init__()
         self._input_dim = input_dim
