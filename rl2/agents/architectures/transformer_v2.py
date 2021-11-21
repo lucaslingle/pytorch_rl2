@@ -148,7 +148,7 @@ class TransformerLayer(tc.nn.Module):
             past_kvs: optional past kvs
 
         Returns:
-            output tensor of shape [B, T2, O], and new kvs
+            output tensor of shape [B, T2, I], and new kvs
         """
         x = inputs
 
@@ -296,7 +296,7 @@ class Transformer(tc.nn.Module):
             '...' must be either one dimensional or must not exist
 
         Returns:
-            output feature tensor of shape [B, ..., O] and new state.
+            output feature tensor and new state.
         """
         assert len(list(inputs.shape)) in [2, 3]
         if len(list(inputs.shape)) == 2:
