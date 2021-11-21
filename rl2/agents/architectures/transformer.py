@@ -394,6 +394,7 @@ class DCTransformerLayer(tc.nn.Module):
 
         i = inputs
         x, new_kvs = self._attn(inputs=x, past_kvs=past_kvs)
+        x = self._proj(x)
         x = self._attn_layer_norm(x)
         x = self._attn_act(x)
         x = tc.cat((i, x), dim=-1)
@@ -422,13 +423,12 @@ class DCSparseTransformerXL(tc.nn.Module):
         self._n_context = n_context
         self._attention_styles = ['row', 'column', 'previous_row']
 
-        self._input_proj = tc.nn.Sequential(
-            tc.nn.Linear(
-                in_features=self._input_dim,
-                out_features=self._feature_dim),
-            LayerNorm(units=self._feature_dim),
-            tc.nn.ReLU()
-        )
+        self._input_proj = tc.nn.Linear(
+             in_features=self._input_dim,
+             out_features=self._feature_dim)
+        tc.nn.init.xavier_normal_(self._input_proj.weight)
+        self._input_layer_norm = LayerNorm(units=self._feature_dim)
+        self._input_act = tc.nn.ReLU()
 
         self._transformer_layers = tc.nn.ModuleList([
             DCTransformerLayer(
@@ -474,6 +474,8 @@ class DCSparseTransformerXL(tc.nn.Module):
         past_kvs = [None] * self._n_layer if prev_state is None else prev_state
 
         inputs = self._input_proj(inputs)
+        inputs = self._input_layer_norm(inputs)
+        inputs = self._input_act(inputs)
 
         new_kvs_by_layer = []
         for l in range(0, self._n_layer):
