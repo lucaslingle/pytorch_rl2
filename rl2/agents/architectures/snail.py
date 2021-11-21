@@ -235,21 +235,21 @@ class SNAIL(tc.nn.Module):
             tc1_out = self._tc1(inputs=inputs, past_inputs=None)
             tc2_out = self._tc2(inputs=tc1_out, past_inputs=None)
             attn_out, new_attn_kv = self._attn(inputs=tc2_out, past_kvs=None)
+            features = tc.cat((tc2_out, attn_out), dim=2)
+            new_state = (tc2_out, new_attn_kv)
         else:
             tc1_out = self._tc1(
                 inputs=inputs, past_inputs=prev_state[0][:, :, 0:self._tc1.state_dim])
-
             tc2_out = self._tc2(
                 inputs=tc1_out, past_inputs=prev_state[0][:, :, 0:self._tc2.state_dim])
-
             attn_out, new_attn_kv = self._attn(
                 inputs=tc2_out, past_kvs=prev_state[1])
 
-        features = tc.cat((tc2_out, attn_out), dim=2)
-        new_state = (
-            tc.cat((prev_state[0], tc2_out), dim=1),
-            new_attn_kv
-        )
+            features = tc.cat((tc2_out, attn_out), dim=2)
+            new_state = (
+                tc.cat((prev_state[0], tc2_out), dim=1),
+                new_attn_kv
+            )
 
         if features.shape[1] == 1:
             features = features.squeeze(1)
