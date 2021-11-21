@@ -76,14 +76,13 @@ class TransformerLayer(tc.nn.Module):
                 letter 'f' cannot be omitted.
             row_len: required if attention_style is not 'full'
         """
-        assert feature_dim % num_heads == 0
         assert position_encoding_style in ['abs', 'rel']
         assert attention_style in ['full', 'row', 'previous_row', 'column']
         assert connection_style in ['plain', 'residual', 'dense']
         assert attention_style == 'full' or row_len is not None
         assert len(layer_ordering) == len(set(layer_ordering))
         assert set(layer_ordering) <= {'a', 'f', 'n'}
-        assert 'f' in list(layer_ordering)
+        assert 'f' in set(layer_ordering)
 
         super().__init__()
         self._input_dim = input_dim
@@ -135,6 +134,12 @@ class TransformerLayer(tc.nn.Module):
         if self._connection_style != 'dense':
             return self._feature_dim
         return self._attn_input_dim + self._feature_dim
+
+    @property
+    def output_dim(self):
+        if self._connection_style != 'dense':
+            return self._feature_dim
+        return self._ff_input_dim + self._feature_dim
 
     def forward(self, inputs, past_kvs=None):
         """
