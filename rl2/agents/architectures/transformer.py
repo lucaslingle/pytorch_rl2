@@ -659,10 +659,11 @@ class NeoTransformer(tc.nn.Module):
             out_features=self._feature_dim)
         tc.nn.init.xavier_normal_(self._input_proj.weight)
         if 'n' in self._layer_ordering:
-            if self._layer_ordering.index('f') < self._layer_ordering.index('n'):
+            if self._layer_ordering.index('n') > self._layer_ordering.index('f'):
                self._input_layer_norm = LayerNorm(units=self._feature_dim)
         if 'a' in self._layer_ordering:
-            self._input_act = tc.nn.ReLU()
+            if self._layer_ordering.index('a') > self._layer_ordering.index('f'):
+                self._input_act = tc.nn.ReLU()
 
         # middle
         self._transformer_layers = tc.nn.ModuleList([
@@ -725,12 +726,15 @@ class NeoTransformer(tc.nn.Module):
         inputs = self._input_proj(inputs)
         for letter in self._layer_ordering:
             if letter == 'n':
-                if self._layer_ordering.index('f') < self._layer_ordering.index('n'):
+                if self._layer_ordering.index('n') > self._layer_ordering.index('f'):
                     inputs = self._input_layer_norm(inputs)
                 else:
                     continue
             elif letter == 'a':
-                inputs = self._input_act(inputs)
+                if self._layer_ordering.index('a') > self._layer_ordering.index('f'):
+                    inputs = self._input_act(inputs)
+                else:
+                    continue
             else:
                 continue
 
