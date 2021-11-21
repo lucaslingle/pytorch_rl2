@@ -700,7 +700,7 @@ class NeoTransformer(tc.nn.Module):
         sparse_attention_styles = ['row', 'column', 'previous_row']
         return sparse_attention_styles[l % 3]
 
-    def _row_len(self, attention_style):
+    def _get_row_len(self, attention_style):
         if attention_style == 'full':
             return None
         small = math.floor(self._n_context ** 0.5)
