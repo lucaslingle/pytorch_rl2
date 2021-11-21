@@ -151,7 +151,7 @@ class TCBlock(tc.nn.Module):
 
     @property
     def output_dim(self):
-        return self._inputs_size + self.num_layers * self._feature_dim
+        return self._input_dim + self.num_layers * self._feature_dim
 
     @property
     def state_dim(self):
