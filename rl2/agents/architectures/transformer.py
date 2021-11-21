@@ -586,9 +586,8 @@ class NeoTransformerLayer(tc.nn.Module):
             elif letter == 'n':
                 x = self._attn_layer_norm(x)
             elif letter == 'f':
-                attn_output, new_kvs = self._attn(x, past_kvs=past_kvs)
-                attn_output = self._proj(attn_output)
-                x = attn_output
+                x, new_kvs = self._attn(x, past_kvs=past_kvs)
+                x = self._proj(x)
                 if self._connection_style == 'residual':
                     x += i
             else:
