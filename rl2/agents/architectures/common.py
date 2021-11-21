@@ -198,8 +198,8 @@ class MultiheadSelfAttention(tc.nn.Module):
                 assert qs.shape[1] % self._row_len == 0
                 n_rows = qs.shape[1] // self._row_len
                 qs = tc.reshape(qs, [-1, n_rows, self._row_len, qs.shape[-1]])
-                ks = tc.reshape(ks, [-1, n_rows, self._row_len, qs.shape[-1]])
-                vs = tc.reshape(vs, [-1, n_rows, self._row_len, qs.shape[-1]])
+                ks = tc.reshape(ks, [-1, n_rows, self._row_len, ks.shape[-1]])
+                vs = tc.reshape(vs, [-1, n_rows, self._row_len, vs.shape[-1]])
                 ks = tc.nn.functional.pad(ks[:,:-1,:,:], (0,0,0,0,1,0))
                 vs = tc.nn.functional.pad(vs[:,:-1,:,:], (0,0,0,0,1,0))
                 qs = tc.reshape(qs, [-1, self._row_len, qs.shape[-1]])
@@ -222,8 +222,8 @@ class MultiheadSelfAttention(tc.nn.Module):
                 assert qs.shape[1] % self._row_len == 0
                 n_rows = qs.shape[1] // self._row_len
                 qs = tc.reshape(qs, [-1, n_rows, self._row_len, qs.shape[-1]])
-                ks = tc.reshape(ks, [-1, n_rows, self._row_len, qs.shape[-1]])
-                vs = tc.reshape(vs, [-1, n_rows, self._row_len, qs.shape[-1]])
+                ks = tc.reshape(ks, [-1, n_rows, self._row_len, ks.shape[-1]])
+                vs = tc.reshape(vs, [-1, n_rows, self._row_len, vs.shape[-1]])
                 qs = qs.permute(0, 2, 1, 3)
                 ks = ks.permute(0, 2, 1, 3)
                 vs = vs.permute(0, 2, 1, 3)
