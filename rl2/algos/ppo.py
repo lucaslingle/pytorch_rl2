@@ -179,7 +179,6 @@ def training_loop(
     meta_ep_returns = deque(maxlen=1000)
 
     for pol_iter in range(pol_iters_so_far, max_pol_iters):
-
         # collect meta-episodes...
         meta_episodes = list()
         for _ in range(0, meta_episodes_per_policy_update):
