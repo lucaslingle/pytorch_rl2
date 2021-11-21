@@ -244,7 +244,6 @@ class SNAIL(tc.nn.Module):
                 inputs=tc1_out, past_inputs=prev_state[0][:, :, 0:self._tc2.state_dim])
             attn_out, new_attn_kv = self._attn(
                 inputs=tc2_out, past_kvs=prev_state[1])
-
             features = tc.cat((tc2_out, attn_out), dim=2)
             new_state = (
                 tc.cat((prev_state[0], tc2_out), dim=1),
