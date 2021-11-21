@@ -134,7 +134,7 @@ class TransformerLayer(tc.nn.Module):
     def _ff_input_dim(self):
         if self._connection_style != 'dense':
             return self._feature_dim
-        return self._attn_sublayer_in_dim + self._feature_dim
+        return self._attn_input_dim + self._feature_dim
 
     def forward(self, inputs, past_kvs=None):
         """
