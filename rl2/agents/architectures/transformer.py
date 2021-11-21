@@ -577,6 +577,14 @@ class NeoTransformerLayer(tc.nn.Module):
         return self._attn_sublayer_in_dim + self._feature_dim
 
     def forward(self, inputs, past_kvs=None):
+        """
+        Args:
+            inputs: input vec tensor of shape [B, T2, I]
+            past_kvs: optional past kvs
+
+        Returns:
+            output tensor of shape [B, T2, I], and new kvs
+        """
         x = inputs
 
         i = inputs
@@ -719,10 +727,8 @@ class NeoTransformer(tc.nn.Module):
         Args:
             inputs: input vec tensor of shape [B, ..., I]
             prev_state: optional previous state.
-
          Notes:
             '...' must be either one dimensional or must not exist
-
         Returns:
             output feature tensor and new state.
         """
