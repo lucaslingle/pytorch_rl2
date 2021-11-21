@@ -12,12 +12,9 @@ from rl2.envs.mdp_env import MDPEnv
 
 from rl2.agents.preprocessing.tabular import MABPreprocessing, MDPPreprocessing
 from rl2.agents.architectures.gru import GRU
+from rl2.agents.architectures.lstm import LSTM
 from rl2.agents.architectures.snail import SNAIL
-from rl2.agents.architectures.transformer import (
-    TransformerXLI,
-    SparseTransformerXLI,
-    DCSparseTransformerXL,
-)
+from rl2.agents.architectures.transformer import Transformer
 from rl2.agents.heads.policy_heads import LinearPolicyHead
 from rl2.agents.heads.value_heads import LinearValueHead
 from rl2.agents.integration.policy_net import StatefulPolicyNet
@@ -43,14 +40,22 @@ def create_argparser():
 
     ### Architecture
     parser.add_argument(
-        "--architecture",
-        choices=[
-            'gru', 'snail', 'trxli', 'sparse_transformer', 'dc_sparse_transformer'
-        ],
+        "--architecture", choices=['gru', 'lstm', 'snail', 'transformer'],
         default='gru')
     parser.add_argument("--num_features", type=int, default=256)
+    """
     parser.add_argument("--forget_bias", type=float, default=1.0,
                         help="Ignored if architecture is not gru/lstm.")
+    parser.add_argument("--transformer_layers", type=int, default=9)
+    parser.add_argument("--transformer_heads", type=int, default=2)
+    parser.add_argument("--transformer_attn_style", choices=['full', 'sparse'],
+                        default='sparse')
+    parser.add_argument("--transformer_connection_style", choices=['residual', 'dense'],
+                        default='dense')
+    parser.add_argument("--transformer_layer_order", type=str, default='fna',
+                        help="order of function, normalization, activation;" +
+                             "letter f cannot be omitted from string")
+    """
 
     ### Checkpointing
     parser.add_argument("--model_name", type=str, default='defaults')
@@ -78,69 +83,59 @@ def create_argparser():
 
 def create_env(environment, num_states, num_actions, episode_len):
     if environment == 'bandit':
-        return BanditEnv(num_actions=num_actions)
-    elif environment == 'mdp':
-        return MDPEnv(num_states=num_states,
-                      num_actions=num_actions,
-                      max_episode_length=episode_len)
-    else:
-        raise NotImplementedError
+        return BanditEnv(
+            num_actions=num_actions)
+    if environment == 'mdp':
+        return MDPEnv(
+            num_states=num_states,
+            num_actions=num_actions,
+            max_episode_length=episode_len)
+    raise NotImplementedError
 
 
 def create_preprocessing(environment, num_states, num_actions):
     if environment == 'bandit':
-        return MABPreprocessing(num_actions=num_actions)
-    elif environment == 'mdp':
+        return MABPreprocessing(
+            num_actions=num_actions)
+    if environment == 'mdp':
         return MDPPreprocessing(
-            num_states=num_states, num_actions=num_actions)
-    else:
-        raise NotImplementedError
+            num_states=num_states,
+            num_actions=num_actions)
+    raise NotImplementedError
 
 
-def create_architecture(
-        environment, architecture, input_dim, num_features,
-        forget_bias, episode_len, episodes_per_meta_episode
-):
-    episode_len = 1 if environment == 'bandit' else episode_len
-    context_size = episode_len * episodes_per_meta_episode
-
+def create_architecture(architecture, input_dim, num_features, context_size):
     if architecture == 'gru':
         return GRU(
             input_dim=input_dim,
             hidden_dim=num_features,
-            forget_bias=forget_bias,
+            forget_bias=1.0,
             use_ln=True,
             reset_after=True)
-    elif architecture == 'snail':
+    if architecture == 'lstm':
+        return LSTM(
+            input_dim=input_dim,
+            hidden_dim=num_features,
+            forget_bias=1.0,
+            use_ln=True)
+    if architecture == 'snail':
         return SNAIL(
             input_dim=input_dim,
             feature_dim=num_features,
             context_size=context_size,
             use_ln=True)
-    elif architecture == 'trxli':
-        return TransformerXLI(
-            input_dim=input_dim,
-            n_layer=9,
-            n_head=4,
-            d_model=num_features,
-            d_head=(num_features // 4))
-    elif architecture == 'sparse_transformer':
-        return SparseTransformerXLI(
-            input_dim=input_dim,
-            n_layer=9,
-            n_head=4,
-            d_model=num_features,
-            d_head=(num_features // 4),
-            n_context=context_size)
-    elif architecture == 'dc_sparse_transformer':
-        return DCSparseTransformerXL(
+    if architecture == 'transformer':
+        return Transformer(
             input_dim=input_dim,
             feature_dim=num_features,
             n_layer=9,
             n_head=2,
-            n_context=context_size)
-    else:
-        raise NotImplementedError
+            n_context=context_size,
+            position_encoding_style='rel',
+            attention_style='sparse',
+            connection_style='dense',
+            layer_ordering='fna')
+    raise NotImplementedError
 
 
 def create_head(num_features, num_actions, head_type):
@@ -148,29 +143,25 @@ def create_head(num_features, num_actions, head_type):
         return LinearPolicyHead(
             num_features=num_features,
             num_actions=num_actions)
-    elif head_type == 'value':
+    if head_type == 'value':
         return LinearValueHead(
             num_features=num_features)
-    else:
-        raise NotImplementedError
+    raise NotImplementedError
 
 
 def create_net(
         environment, architecture, num_states, num_actions, num_features,
-        forget_bias, episode_len, episodes_per_meta_episode, net_type
+        context_size, net_type
 ):
     preprocessing = create_preprocessing(
         environment=environment,
         num_states=num_states,
         num_actions=num_actions)
     architecture = create_architecture(
-        environment=environment,
         architecture=architecture,
         input_dim=preprocessing.output_dim,
         num_features=num_features,
-        forget_bias=forget_bias,
-        episode_len=episode_len,
-        episodes_per_meta_episode=episodes_per_meta_episode)
+        context_size=context_size)
     head = create_head(
         num_features=architecture.output_dim,
         num_actions=num_actions,
@@ -181,13 +172,12 @@ def create_net(
             preprocessing=preprocessing,
             architecture=architecture,
             policy_head=head)
-    elif net_type == 'value':
+    if net_type == 'value':
         return StatefulValueNet(
             preprocessing=preprocessing,
             architecture=architecture,
             value_head=head)
-    else:
-        raise NotImplementedError
+    raise NotImplementedError
 
 
 def main():
@@ -201,6 +191,9 @@ def main():
         num_actions=args.num_actions,
         episode_len=args.episode_len)
 
+    episode_len = env.episode_len
+    context_size = episode_len * args.episodes_per_meta_episode
+
     # create learning system.
     policy_net = create_net(
         environment=args.environment,
@@ -208,9 +201,7 @@ def main():
         num_states=args.num_states,
         num_actions=args.num_actions,
         num_features=args.num_features,
-        forget_bias=args.forget_bias,
-        episode_len=args.episode_len,
-        episodes_per_meta_episode=args.episodes_per_meta_episode,
+        context_size=context_size,
         net_type='policy')
 
     value_net = create_net(
@@ -219,9 +210,7 @@ def main():
         num_states=args.num_states,
         num_actions=args.num_actions,
         num_features=args.num_features,
-        forget_bias=args.forget_bias,
-        episode_len=args.episode_len,
-        episodes_per_meta_episode=args.episodes_per_meta_episode,
+        context_size=context_size,
         net_type='value')
 
     policy_optimizer = tc.optim.AdamW(
@@ -293,7 +282,6 @@ def main():
         scheduler=value_scheduler)
 
     # run it!
-    episode_len = 1 if args.environment == 'bandit' else args.episode_len
     if args.meta_episodes_per_policy_update == -1:
         num_procs = comm.Get_size()
         numer = 240000  # total number of observations per policy improvement
