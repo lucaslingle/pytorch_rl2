@@ -33,7 +33,7 @@ class FF(tc.nn.Module):
             in_features=self._hidden_dim,
             out_features=self._output_dim,
             bias=True)
-        tc.nn.init.zeros_(self._lin2.weight)
+        tc.nn.init.xavier_normal_(self._lin2.weight)
         tc.nn.init.zeros_(self._lin2.bias)
 
     def forward(self, inputs):
