@@ -343,10 +343,13 @@ class Transformer(tc.nn.Module):
         # input
         inputs = self._input_proj(inputs)
         if self._position_encoding_style == 'abs':
+            lp = 0 if prev_state is None else prev_state[0].shape[1]
+            pos_embs = self._position_embeddings[lp:lp+inputs.shape[1], :]
+            pos_embs = pos_embs.unsqueeze(0)
             if self._connection_style != 'dense':
-                inputs = inputs + self._position_embeddings
+                inputs = inputs + pos_embs
             else:
-                inputs = tc.cat((inputs, self._position_embeddings), dim=-1)
+                inputs = tc.cat((inputs, pos_embs), dim=-1)
         if self._in_logic:
             for letter in self._layer_ordering:
                 if letter == 'n':
