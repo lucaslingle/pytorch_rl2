@@ -270,7 +270,7 @@ def main():
     # run it!
     if args.meta_episodes_per_policy_update == -1:
         numer = 240000
-        denom = numer // (comm.Get_size() * args.meta_episode_len)
+        denom = comm.Get_size() * args.meta_episode_len
         meta_episodes_per_policy_update = numer // denom
     else:
         meta_episodes_per_policy_update = args.meta_episodes_per_policy_update
