@@ -343,8 +343,10 @@ class Transformer(tc.nn.Module):
         # input
         inputs = self._input_proj(inputs)
         if self._position_encoding_style == 'abs':
-            lp = 0 if prev_state is None else prev_state[0].shape[1]
-            pos_embs = self._position_embeddings[lp:lp+inputs.shape[1], :]
+            t1 = 0 if prev_state is None else prev_state[0].shape[1]
+            t2 = inputs.shape[1]
+            assert t1 + t2 <= self._n_context
+            pos_embs = self._position_embeddings[t1:t1+t2, :]
             pos_embs = pos_embs.unsqueeze(0)
             if self._connection_style != 'dense':
                 inputs = inputs + pos_embs
