@@ -253,6 +253,9 @@ class Transformer(tc.nn.Module):
             in_features=self._input_dim,
             out_features=self._feature_dim)
         tc.nn.init.xavier_normal_(self._input_proj.weight)
+        # TODO(lucaslingle): add support for absolute position encoding here.
+        #  for densely connected nets, consider concatenating rather than adding
+        #  the position embeddings.
         if self._in_logic:
             if 'n' in self._layer_ordering:
                 if self._layer_ordering.index('n') > self._layer_ordering.index('f'):
@@ -286,6 +289,7 @@ class Transformer(tc.nn.Module):
                     self._output_act = self._activation()
 
     def _get_input_dim(self, l):
+        # TODO(lucaslingle): see above todo
         if self._connection_style != 'dense':
             return self._feature_dim
         return (2*l+1) * self._feature_dim
@@ -331,6 +335,7 @@ class Transformer(tc.nn.Module):
 
         # input
         inputs = self._input_proj(inputs)
+        # TODO(lucaslingle): see above todo
         if self._in_logic:
             for letter in self._layer_ordering:
                 if letter == 'n':
