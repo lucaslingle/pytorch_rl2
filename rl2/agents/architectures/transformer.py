@@ -15,7 +15,8 @@ class FF(tc.nn.Module):
             self,
             input_dim,
             hidden_dim,
-            output_dim
+            output_dim,
+            activation=tc.nn.ReLU
     ):
         super().__init__()
         self._input_dim = input_dim
@@ -28,6 +29,8 @@ class FF(tc.nn.Module):
             bias=True)
         tc.nn.init.xavier_normal_(self._lin1.weight)
         tc.nn.init.zeros_(self._lin1.bias)
+
+        self._act = activation()
 
         self._lin2 = tc.nn.Linear(
             in_features=self._hidden_dim,
@@ -46,7 +49,7 @@ class FF(tc.nn.Module):
         """
         x = inputs
         x = self._lin1(x)
-        x = tc.nn.ReLU()(x)
+        x = self._act(x)
         x = self._lin2(x)
         return x
 
@@ -61,7 +64,8 @@ class TransformerLayer(tc.nn.Module):
             attention_style: str,
             connection_style: str,
             layer_ordering: str,
-            row_len: Optional[int] = None
+            row_len: Optional[int] = None,
+            activation=tc.nn.ReLU
     ):
         """
         Args:
@@ -75,6 +79,7 @@ class TransformerLayer(tc.nn.Module):
                 should be letters chosen from 'a', 'f', 'n' in any order.
                 letter 'f' cannot be omitted.
             row_len: required if attention_style is not 'full'
+            activation: activation function to use in ff and anywhere else.
         """
         assert position_encoding_style in ['abs', 'rel']
         assert attention_style in ['full', 'row', 'previous_row', 'column']
@@ -94,6 +99,7 @@ class TransformerLayer(tc.nn.Module):
         self._connection_style = connection_style
         self._layer_ordering = list(layer_ordering)
         self._row_len = row_len
+        self._activation = activation
 
         self._attn = MultiheadSelfAttention(
             input_dim=self._attn_input_dim,
@@ -111,7 +117,8 @@ class TransformerLayer(tc.nn.Module):
         self._ff = FF(
             input_dim=self._ff_input_dim,
             hidden_dim=self._feature_dim,
-            output_dim=self._feature_dim)
+            output_dim=self._feature_dim,
+            activation=self._activation)
 
         if 'n' in self._layer_ordering:
             if self._layer_ordering.index('n') < self._layer_ordering.index('f'):
@@ -122,8 +129,8 @@ class TransformerLayer(tc.nn.Module):
                 self._ff_layer_norm = LayerNorm(units=self._feature_dim)
 
         if 'a' in self._layer_ordering:
-            self._attn_act = tc.nn.ReLU()
-            self._ff_act = tc.nn.ReLU()
+            self._attn_act = self._activation()
+            self._ff_act = self._activation()
 
     @property
     def _attn_input_dim(self):
@@ -200,6 +207,9 @@ class Transformer(tc.nn.Module):
             attention_style,
             connection_style,
             layer_ordering,
+            activation=tc.nn.ReLU,
+            in_logic=True,
+            out_logic=True
     ):
         """
         Args:
@@ -214,6 +224,9 @@ class Transformer(tc.nn.Module):
             layer_ordering: ordering of activation, function, and normalization.
                 should be letters chosen from 'a', 'f', 'n' in any order.
                 letter 'f' cannot be omitted.
+            activation: activation function to use in ff and anywhere else.
+            in_logic: apply layer ordering logic to input linear projection?
+            out_logic: apply layer ordering logic to output features?
         """
         super().__init__()
         self._input_dim = input_dim
@@ -224,18 +237,22 @@ class Transformer(tc.nn.Module):
         self._position_encoding_style = position_encoding_style
         self._connection_style = connection_style
         self._layer_ordering = list(layer_ordering)
+        self._activation = activation
+        self._in_logic = in_logic
+        self._out_logic = out_logic
 
         # input
         self._input_proj = tc.nn.Linear(
             in_features=self._input_dim,
             out_features=self._feature_dim)
         tc.nn.init.xavier_normal_(self._input_proj.weight)
-        if 'n' in self._layer_ordering:
-            if self._layer_ordering.index('n') > self._layer_ordering.index('f'):
-               self._input_layer_norm = LayerNorm(units=self._feature_dim)
-        if 'a' in self._layer_ordering:
-            if self._layer_ordering.index('a') > self._layer_ordering.index('f'):
-                self._input_act = tc.nn.ReLU()
+        if self._in_logic:
+            if 'n' in self._layer_ordering:
+                if self._layer_ordering.index('n') > self._layer_ordering.index('f'):
+                    self._input_layer_norm = LayerNorm(units=self._feature_dim)
+            if 'a' in self._layer_ordering:
+                if self._layer_ordering.index('a') > self._layer_ordering.index('f'):
+                    self._input_act = self._activation()
 
         # middle
         self._transformer_layers = tc.nn.ModuleList([
@@ -247,17 +264,19 @@ class Transformer(tc.nn.Module):
                 attention_style=self._get_attention_style(attention_style, l),
                 connection_style=self._connection_style,
                 layer_ordering=''.join(self._layer_ordering),
-                row_len=self._get_row_len(attention_style))
+                row_len=self._get_row_len(attention_style),
+                activation=self._activation)
             for l in range(self._n_layer)
         ])
 
         # output
-        if 'n' in self._layer_ordering:
-            if self._layer_ordering.index('n') < self._layer_ordering.index('f'):
-               self._output_layer_norm = LayerNorm(units=self.output_dim)
-        if 'a' in self._layer_ordering:
-            if self._layer_ordering.index('a') < self._layer_ordering.index('f'):
-               self._output_act = tc.nn.ReLU()
+        if self._out_logic:
+            if 'n' in self._layer_ordering:
+                if self._layer_ordering.index('n') < self._layer_ordering.index('f'):
+                    self._output_layer_norm = LayerNorm(units=self.output_dim)
+            if 'a' in self._layer_ordering:
+                if self._layer_ordering.index('a') < self._layer_ordering.index('f'):
+                    self._output_act = self._activation()
 
     def _get_input_dim(self, l):
         if self._connection_style != 'dense':
@@ -267,7 +286,6 @@ class Transformer(tc.nn.Module):
     def _get_attention_style(self, attention_style, l):
         if attention_style == 'full':
             return 'full'
-
         sparse_attention_styles = ['row', 'column', 'previous_row']
         return sparse_attention_styles[l % 3]
 
@@ -306,15 +324,14 @@ class Transformer(tc.nn.Module):
 
         # input
         inputs = self._input_proj(inputs)
-        for letter in self._layer_ordering:
-            if letter == 'n':
-                if self._layer_ordering.index('n') > self._layer_ordering.index('f'):
-                    inputs = self._input_layer_norm(inputs)
-            elif letter == 'a':
-                if self._layer_ordering.index('a') > self._layer_ordering.index('f'):
-                    inputs = self._input_act(inputs)
-            else:
-                continue
+        if self._in_logic:
+            for letter in self._layer_ordering:
+                if letter == 'n':
+                    if self._layer_ordering.index('n') > self._layer_ordering.index('f'):
+                        inputs = self._input_layer_norm(inputs)
+                elif letter == 'a':
+                    if self._layer_ordering.index('a') > self._layer_ordering.index('f'):
+                        inputs = self._input_act(inputs)
 
         # middle
         new_kvs_by_layer = []
@@ -324,15 +341,14 @@ class Transformer(tc.nn.Module):
             new_kvs_by_layer.append(new_kvs)
 
         # output
-        for letter in self._layer_ordering:
-            if letter == 'n':
-                if self._layer_ordering.index('n') < self._layer_ordering.index('f'):
-                    inputs = self._output_layer_norm(inputs)
-            elif letter == 'a':
-                if self._layer_ordering.index('a') < self._layer_ordering.index('f'):
-                    inputs = self._output_act(inputs)
-            else:
-                continue
+        if self._out_logic:
+            for letter in self._layer_ordering:
+                if letter == 'n':
+                    if self._layer_ordering.index('n') < self._layer_ordering.index('f'):
+                        inputs = self._output_layer_norm(inputs)
+                elif letter == 'a':
+                    if self._layer_ordering.index('a') < self._layer_ordering.index('f'):
+                        inputs = self._output_act(inputs)
 
         features = inputs
 
