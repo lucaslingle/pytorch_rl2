@@ -32,30 +32,22 @@ def create_argparser():
         description="""Training script for RL^2.""")
 
     ### Environment
-    parser.add_argument("--environment", choices=['bandit', 'mdp'],
+    parser.add_argument("--environment", choices=['bandit', 'tabular_mdp'],
                         default='bandit')
     parser.add_argument("--num_states", type=int, default=10,
                         help="Ignored if environment is bandit.")
     parser.add_argument("--num_actions", type=int, default=5)
+    parser.add_argument("--max_episode_len", type=int, default=10,
+                        help="Timesteps before automatic episode reset. " +
+                             "Ignored if environment is bandit.")
+    parser.add_argument("--meta_episode_len", type=int, default=100,
+                        help="Timesteps per meta-episode.")
 
     ### Architecture
     parser.add_argument(
         "--architecture", choices=['gru', 'lstm', 'snail', 'transformer'],
         default='gru')
     parser.add_argument("--num_features", type=int, default=256)
-    """
-    parser.add_argument("--forget_bias", type=float, default=1.0,
-                        help="Ignored if architecture is not gru/lstm.")
-    parser.add_argument("--transformer_layers", type=int, default=9)
-    parser.add_argument("--transformer_heads", type=int, default=2)
-    parser.add_argument("--transformer_attn_style", choices=['full', 'sparse'],
-                        default='sparse')
-    parser.add_argument("--transformer_connection_style", choices=['residual', 'dense'],
-                        default='dense')
-    parser.add_argument("--transformer_layer_order", type=str, default='fna',
-                        help="order of function, normalization, activation;" +
-                             "letter f cannot be omitted from string")
-    """
 
     ### Checkpointing
     parser.add_argument("--model_name", type=str, default='defaults')
@@ -63,12 +55,9 @@ def create_argparser():
 
     ### Training
     parser.add_argument("--max_pol_iters", type=int, default=12000)
-    parser.add_argument("--episode_len", type=int, default=10,
-                        help="Ignored if environment is bandit.")
-    parser.add_argument("--episodes_per_meta_episode", type=int, default=10)
     parser.add_argument("--meta_episodes_per_policy_update", type=int, default=-1,
                         help="If -1, quantity is determined using a formula")
-    parser.add_argument("--meta_episodes_per_actor_batch", type=int, default=60)
+    parser.add_argument("--meta_episodes_per_learner_batch", type=int, default=60)
     parser.add_argument("--ppo_opt_epochs", type=int, default=8)
     parser.add_argument("--ppo_clip_param", type=float, default=0.10)
     parser.add_argument("--ppo_ent_coef", type=float, default=0.01)
@@ -81,15 +70,15 @@ def create_argparser():
     return parser
 
 
-def create_env(environment, num_states, num_actions, episode_len):
+def create_env(environment, num_states, num_actions, max_episode_len):
     if environment == 'bandit':
         return BanditEnv(
             num_actions=num_actions)
-    if environment == 'mdp':
+    if environment == 'tabular_mdp':
         return MDPEnv(
             num_states=num_states,
             num_actions=num_actions,
-            max_episode_length=episode_len)
+            max_episode_length=max_episode_len)
     raise NotImplementedError
 
 
@@ -97,7 +86,7 @@ def create_preprocessing(environment, num_states, num_actions):
     if environment == 'bandit':
         return MABPreprocessing(
             num_actions=num_actions)
-    if environment == 'mdp':
+    if environment == 'tabular_mdp':
         return MDPPreprocessing(
             num_states=num_states,
             num_actions=num_actions)
@@ -189,10 +178,7 @@ def main():
         environment=args.environment,
         num_states=args.num_states,
         num_actions=args.num_actions,
-        episode_len=args.episode_len)
-
-    episode_len = env.episode_len
-    context_size = episode_len * args.episodes_per_meta_episode
+        max_episode_len=args.max_episode_len)
 
     # create learning system.
     policy_net = create_net(
@@ -201,7 +187,7 @@ def main():
         num_states=args.num_states,
         num_actions=args.num_actions,
         num_features=args.num_features,
-        context_size=context_size,
+        context_size=args.meta_episode_len,
         net_type='policy')
 
     value_net = create_net(
@@ -210,7 +196,7 @@ def main():
         num_states=args.num_states,
         num_actions=args.num_actions,
         num_features=args.num_features,
-        context_size=context_size,
+        context_size=args.meta_episode_len,
         net_type='value')
 
     policy_optimizer = tc.optim.AdamW(
@@ -283,9 +269,8 @@ def main():
 
     # run it!
     if args.meta_episodes_per_policy_update == -1:
-        num_procs = comm.Get_size()
-        numer = 240000  # total number of observations per policy improvement
-        denom = num_procs * episode_len * args.episodes_per_meta_episode
+        numer = 240000
+        denom = numer // (comm.Get_size() * args.meta_episode_len)
         meta_episodes_per_policy_update = numer // denom
     else:
         meta_episodes_per_policy_update = args.meta_episodes_per_policy_update
@@ -298,10 +283,9 @@ def main():
         value_optimizer=value_optimizer,
         policy_scheduler=policy_scheduler,
         value_scheduler=value_scheduler,
-        episode_len=episode_len,
-        episodes_per_meta_episode=args.episodes_per_meta_episode,
-        meta_episodes_per_actor_batch=args.meta_episodes_per_actor_batch,
         meta_episodes_per_policy_update=meta_episodes_per_policy_update,
+        meta_episodes_per_learner_batch=args.meta_episodes_per_learner_batch,
+        meta_episode_len=args.meta_episode_len,
         ppo_opt_epochs=args.ppo_opt_epochs,
         ppo_clip_param=args.ppo_clip_param,
         ppo_ent_coef=args.ppo_ent_coef,

@@ -128,10 +128,9 @@ def training_loop(
         value_optimizer: tc.optim.Optimizer,
         policy_scheduler: Optional[tc.optim.lr_scheduler._LRScheduler],  # pylint: disable=W0212
         value_scheduler: Optional[tc.optim.lr_scheduler._LRScheduler],  # pylint: disable=W0212
-        episode_len: int,
-        episodes_per_meta_episode: int,
-        meta_episodes_per_actor_batch: int,
         meta_episodes_per_policy_update: int,
+        meta_episodes_per_learner_batch: int,
+        meta_episode_len: int,
         ppo_opt_epochs: int,
         ppo_clip_param: float,
         ppo_ent_coef: float,
@@ -156,11 +155,10 @@ def training_loop(
         value_optimizer: value optimizer.
         policy_scheduler: policy lr scheduler.
         value_scheduler: value lr scheduler.
-        episode_len: timesteps per episode.
-        episodes_per_meta_episode: episodes per meta-episode.
-        meta_episodes_per_actor_batch: meta-episodes per batch on each process.
-        meta_episodes_per_policy_update: meta-episodes per policy improvement
+        meta_episodes_per_policy_update: meta-episodes per policy improvement,
             on each process.
+        meta_episodes_per_learner_batch: meta-episodes per batch on each process.
+        meta_episode_len: timesteps per meta-episode.
         ppo_opt_epochs: optimization epochs for proximal policy optimization.
         ppo_clip_param: clip parameter for proximal policy optimization.
         ppo_ent_coef: entropy bonus coefficient for proximal policy optimization
@@ -187,8 +185,7 @@ def training_loop(
                 env=env,
                 policy_net=policy_net,
                 value_net=value_net,
-                episode_len=episode_len,
-                num_episodes=episodes_per_meta_episode)
+                meta_episode_len=meta_episode_len)
             meta_episode = assign_credit(
                 meta_episode=meta_episode,
                 gamma=discount_gamma,
@@ -228,8 +225,8 @@ def training_loop(
         # update policy...
         for opt_epoch in range(ppo_opt_epochs):
             idxs = np.random.permutation(meta_episodes_per_policy_update)
-            for i in range(0, meta_episodes_per_policy_update, meta_episodes_per_actor_batch):
-                mb_idxs = idxs[i:i+meta_episodes_per_actor_batch]
+            for i in range(0, meta_episodes_per_policy_update, meta_episodes_per_learner_batch):
+                mb_idxs = idxs[i:i+meta_episodes_per_learner_batch]
                 mb_meta_eps = [meta_episodes[idx] for idx in mb_idxs]
                 losses = compute_losses(
                     meta_episodes=mb_meta_eps,

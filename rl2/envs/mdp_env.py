@@ -31,7 +31,7 @@ class MDPEnv(MetaEpisodicEnv):
         self._state = 0
 
     @property
-    def episode_len(self):
+    def max_episode_len(self):
         return self._max_ep_length
 
     @property

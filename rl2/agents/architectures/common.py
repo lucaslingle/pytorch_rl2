@@ -310,11 +310,9 @@ class MultiheadSelfAttention(tc.nn.Module):
 
         if self._position_encoding_style == 'rel':
             batch_size, src_len, d_model = bsp, ks.shape[1], inputs.shape[-1]
-
             max_len = src_len
             if self._attention_style == 'previous_row':
                 max_len += qs.shape[1]
-
             r_mat = sinusoidal_embeddings(max_len, d_model, reverse=True)  # [M, I]
             rs = self._r_linear(r_mat)                                     # [M, H*F]
 
