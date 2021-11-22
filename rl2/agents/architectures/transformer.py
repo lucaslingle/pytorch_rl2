@@ -7,7 +7,11 @@ import math
 
 import torch as tc
 
-from rl2.agents.architectures.common import LayerNorm, MultiheadSelfAttention
+from rl2.agents.architectures.common import (
+    sinusoidal_embeddings,
+    LayerNorm,
+    MultiheadSelfAttention,
+)
 
 
 class FF(tc.nn.Module):
@@ -57,14 +61,14 @@ class FF(tc.nn.Module):
 class TransformerLayer(tc.nn.Module):
     def __init__(
             self,
-            input_dim: int,
-            feature_dim: int,
-            num_heads: int,
-            position_encoding_style: str,
-            attention_style: str,
-            connection_style: str,
-            layer_ordering: str,
-            row_len: Optional[int] = None,
+            input_dim,
+            feature_dim,
+            num_heads,
+            position_encoding_style,
+            attention_style,
+            connection_style,
+            layer_ordering,
+            row_len=None,
             activation=tc.nn.ReLU
     ):
         """
@@ -253,13 +257,14 @@ class Transformer(tc.nn.Module):
             in_features=self._input_dim,
             out_features=self._feature_dim)
         tc.nn.init.xavier_normal_(self._input_proj.weight)
-        # TODO(lucaslingle): add support for absolute position encoding here.
-        #  for densely connected nets, consider concatenating rather than adding
-        #  the position embeddings.
+        if self._position_encoding_style == 'abs':
+            self._position_embeddings = sinusoidal_embeddings(
+                self._n_context, self._feature_dim, reverse=False)
+
         if self._in_logic:
             if 'n' in self._layer_ordering:
                 if self._layer_ordering.index('n') > self._layer_ordering.index('f'):
-                    self._input_layer_norm = LayerNorm(units=self._feature_dim)
+                    self._input_layer_norm = LayerNorm(units=self._get_input_dim(0))
             if 'a' in self._layer_ordering:
                 if self._layer_ordering.index('a') > self._layer_ordering.index('f'):
                     self._input_act = self._activation()
@@ -289,10 +294,12 @@ class Transformer(tc.nn.Module):
                     self._output_act = self._activation()
 
     def _get_input_dim(self, l):
-        # TODO(lucaslingle): see above todo
         if self._connection_style != 'dense':
             return self._feature_dim
-        return (2*l+1) * self._feature_dim
+        else:
+            if self._position_encoding_style == 'abs':
+                return (2*l+2) * self._feature_dim
+            return (2*l+1) * self._feature_dim
 
     def _get_attention_style(self, attention_style, l):
         if attention_style == 'full':
@@ -335,7 +342,11 @@ class Transformer(tc.nn.Module):
 
         # input
         inputs = self._input_proj(inputs)
-        # TODO(lucaslingle): see above todo
+        if self._position_encoding_style == 'abs':
+            if self._connection_style != 'dense':
+                inputs = inputs + self._position_embeddings
+            else:
+                inputs = tc.cat((inputs, self._position_embeddings), dim=-1)
         if self._in_logic:
             for letter in self._layer_ordering:
                 if letter == 'n':
