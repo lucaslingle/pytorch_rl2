@@ -220,7 +220,7 @@ class Transformer(tc.nn.Module):
             n_context: meta-episode length.
             position_encoding_style: one of 'abs', 'rel'.
             attention_style: one of 'full', 'sparse'.
-            connection_style: one of 'residual', 'dense'.
+            connection_style: one of 'plain', 'residual', 'dense'.
             layer_ordering: ordering of activation, function, and normalization.
                 should be letters chosen from 'a', 'f', 'n' in any order.
                 letter 'f' cannot be omitted.
@@ -228,6 +228,13 @@ class Transformer(tc.nn.Module):
             in_logic: apply layer ordering logic to input linear projection?
             out_logic: apply layer ordering logic to output features?
         """
+        assert position_encoding_style in ['abs', 'rel']
+        assert attention_style in ['full', 'sparse']
+        assert connection_style in ['residual', 'dense']
+        assert len(layer_ordering) == len(set(layer_ordering))
+        assert set(layer_ordering) <= {'a', 'f', 'n'}
+        assert 'f' in set(layer_ordering)
+
         super().__init__()
         self._input_dim = input_dim
         self._feature_dim = feature_dim
