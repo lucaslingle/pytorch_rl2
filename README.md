@@ -60,7 +60,7 @@ you can set the ```--checkpoint_dir``` flag, and to pick a different checkpoint 
 
 ## Reproducing the Papers
 
-Our implementations matched or exceeded the published performance of RL^2 GRU (Duan et al., 2016) and RL^2 SNAIL (Mishra et al., 2017) in every setting we tested.
+Our implementations closely matched or slightly exceeded the published performance of RL^2 GRU (Duan et al., 2016) and RL^2 SNAIL (Mishra et al., 2017) in every setting we tested.
 
 In the tables below, ```n``` is the number of episodes per meta-episode, and ```k``` is the number of actions. 
 Following Duan et al., 2016 and Mishra et al., 2017, in our tabular MDP experiments, all MDPs have 10 states and 5 actions, and the episode length is 10.  
@@ -72,7 +72,7 @@ Following Duan et al., 2016 and Mishra et al., 2017, in our tabular MDP experime
 |  n=10,k=5  |    5.0 |     6.6 |   5.7 |   6.5 |   6.7 |        6.6 |    6.6 |              6.7 |            6.7  |                6.6 |                6.8 |
 |  n=10,k=10 |    5.0 |     6.6 |   5.5 |   6.2 |   6.7 |        6.6 |    6.6 |              6.7 |                 |                6.7 |                    |
 |  n=10,k=50 |    5.1 |     6.5 |   5.2 |   5.5 |   6.6 |        6.5 |    6.5 |              6.8 |                 |                6.7 |                    |
-| n=100,k=5  |   49.9 |    78.3 |  74.7 |  77.9 |  78.0 |       75.4 |   74.8 |             78.7 |            78.7 |               79.1 |                    |
+| n=100,k=5  |   49.9 |    78.3 |  74.7 |  77.9 |  78.0 |       75.4 |   74.8 |             78.7 |            78.7 |               79.1 |               78.5 |
 | n=100,k=10 |   49.9 |    82.8 |  76.7 |  81.4 |  82.4 |       77.4 |   77.1 |             83.5 |                 |               83.5 |                    |
 | n=100,k=50 |   49.8 |    85.2 |  64.5 |  67.7 |  84.3 |       78.3 |   78.0 |             84.9 |                 |               85.1 |                    |
 | n=500,k=5  |  249.8 |   405.8 | 402.0 | 406.7 | 405.8 |      388.2 |  380.6 |            401.6 |                 |              408.1 |                    |

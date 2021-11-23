@@ -29,7 +29,7 @@ def generate_meta_episode(
         env: MetaEpisodicEnv,
         policy_net: StatefulPolicyNet,
         value_net: StatefulValueNet,
-        meta_episode_length: int
+        meta_episode_len: int
     ) -> MetaEpisode:
     """
     Generates a meta-episode: a sequence of episodes concatenated together,
@@ -40,7 +40,7 @@ def generate_meta_episode(
         env: environment.
         policy_net: policy network.
         value_net: value network.
-        meta_episode_length: timesteps per meta-episode.
+        meta_episode_len: timesteps per meta-episode.
 
     Returns:
         meta_episode: an instance of the meta-episode class.
@@ -48,7 +48,7 @@ def generate_meta_episode(
 
     env.new_env()
     meta_episode = MetaEpisode(
-        num_timesteps=meta_episode_length,
+        num_timesteps=meta_episode_len,
         dummy_obs=env.reset())
 
     o_t = np.array([env.reset()])
