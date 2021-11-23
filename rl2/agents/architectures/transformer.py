@@ -319,12 +319,21 @@ class Transformer(tc.nn.Module):
         return None
 
     def _add_position_embeddings(self, inputs, prev_state):
+        """
+        Args:
+            inputs: input tensor.
+            prev_state: optional layerwise list of tuples of keys and values.
+                the keys and values are each lists of tensors, or are tensors.
+        Returns:
+            output tensor.
+        """
         assert prev_state is None or type(prev_state) == list
         t1 = 0
         if prev_state is not None:
-            if type(prev_state[0]) == list:
-                t1 = len(prev_state[0])
-            elif type(prev_state[0]) == tc.Tensor:
+            k, _ = prev_state[0]
+            if type(k) == list:
+                t1 = len(k)
+            elif type(k) == tc.Tensor:
                 t1 = prev_state[0].shape[1]
             else:
                 raise TypeError
