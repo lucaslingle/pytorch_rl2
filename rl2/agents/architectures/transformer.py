@@ -323,16 +323,15 @@ class Transformer(tc.nn.Module):
         return None
 
     def _add_position_embeddings(self, inputs, past_kvs):
-        if self._position_encoding_style == 'abs':
-            t1 = 0 if past_kvs[0] is None else past_kvs[0].shape[1]
-            t2 = inputs.shape[1]
-            assert t1 + t2 <= self._n_context
-            pos_embs = self._position_embeddings[t1:t1+t2, :]
-            pos_embs = pos_embs.unsqueeze(0)
-            if self._connection_style != 'dense':
-                inputs = inputs + pos_embs
-            else:
-                inputs = tc.cat((inputs, pos_embs), dim=-1)
+        t1 = 0 if past_kvs[0] is None else past_kvs[0].shape[1]
+        t2 = inputs.shape[1]
+        assert t1 + t2 <= self._n_context
+        pos_embs = self._position_embeddings[t1:t1+t2, :]
+        pos_embs = pos_embs.unsqueeze(0)
+        if self._connection_style != 'dense':
+            inputs = inputs + pos_embs
+        else:
+            inputs = tc.cat((inputs, pos_embs), dim=-1)
         return inputs
 
     def _run_input_logic(self, inputs):
@@ -373,7 +372,8 @@ class Transformer(tc.nn.Module):
 
         # input
         inputs = self._input_proj(inputs)
-        inputs = self._add_position_embeddings(inputs, prev_state)
+        if self._position_encoding_style == 'abs':
+            inputs = self._add_position_embeddings(inputs, prev_state)
         if self._in_logic:
             inputs = self._run_input_logic(inputs)
 
