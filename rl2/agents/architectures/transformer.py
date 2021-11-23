@@ -264,7 +264,7 @@ class Transformer(tc.nn.Module):
         if self._in_logic:
             if 'n' in self._layer_ordering:
                 if self._layer_ordering.index('n') > self._layer_ordering.index('f'):
-                    self._input_layer_norm = LayerNorm(units=self._get_input_dim(0))
+                    self._input_layer_norm = LayerNorm(units=self._feature_dim)
             if 'a' in self._layer_ordering:
                 if self._layer_ordering.index('a') > self._layer_ordering.index('f'):
                     self._input_act = self._activation()
@@ -372,10 +372,10 @@ class Transformer(tc.nn.Module):
 
         # input
         inputs = self._input_proj(inputs)
-        if self._position_encoding_style == 'abs':
-            inputs = self._add_position_embeddings(inputs, prev_state)
         if self._in_logic:
             inputs = self._run_input_logic(inputs)
+        if self._position_encoding_style == 'abs':
+            inputs = self._add_position_embeddings(inputs, prev_state)
 
         # middle
         past_kvs = [None] * self._n_layer if prev_state is None else prev_state
