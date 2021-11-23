@@ -344,6 +344,7 @@ class Transformer(tc.nn.Module):
         if self._connection_style != 'dense':
             inputs = inputs + pos_embs
         else:
+            pos_embs = tc.tile(pos_embs, [inputs.shape[0], 1, 1])
             inputs = tc.cat((inputs, pos_embs), dim=-1)
         return inputs
 
