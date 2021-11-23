@@ -257,10 +257,6 @@ class Transformer(tc.nn.Module):
             in_features=self._input_dim,
             out_features=self._feature_dim)
         tc.nn.init.xavier_normal_(self._input_proj.weight)
-        if self._position_encoding_style == 'abs':
-            self._position_embeddings = sinusoidal_embeddings(
-                self._n_context, self._feature_dim, reverse=False)
-
         if self._in_logic:
             if 'n' in self._layer_ordering:
                 if self._layer_ordering.index('n') > self._layer_ordering.index('f'):
@@ -268,6 +264,9 @@ class Transformer(tc.nn.Module):
             if 'a' in self._layer_ordering:
                 if self._layer_ordering.index('a') > self._layer_ordering.index('f'):
                     self._input_act = self._activation()
+        if self._position_encoding_style == 'abs':
+            self._position_embeddings = sinusoidal_embeddings(
+                self._n_context, self._feature_dim, reverse=False)
 
         # middle
         self._transformer_layers = tc.nn.ModuleList([
