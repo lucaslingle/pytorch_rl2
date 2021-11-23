@@ -2,9 +2,6 @@
 Implements Transformer architectures for RL^2.
 """
 
-from typing import Optional
-import math
-
 import torch as tc
 
 from rl2.agents.architectures.common import (
@@ -309,7 +306,7 @@ class Transformer(tc.nn.Module):
     def _get_row_len(self, attention_style):
         if attention_style == 'full':
             return None
-        small = math.floor(self._n_context ** 0.5)
+        small = int(self._n_context ** 0.5)
         while self._n_context % small != 0:
             small -= 1
         return small
@@ -322,7 +319,7 @@ class Transformer(tc.nn.Module):
         return None
 
     def _add_position_embeddings(self, inputs, prev_state):
-        assert type(prev_state) == list
+        assert prev_state is None or type(prev_state) == list
         t1 = 0
         if prev_state is not None:
             if type(prev_state[0]) == list:

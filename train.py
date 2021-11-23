@@ -120,10 +120,12 @@ def create_architecture(architecture, input_dim, num_features, context_size):
             n_layer=9,
             n_head=2,
             n_context=context_size,
-            position_encoding_style='rel',
+            position_encoding_style='abs',
             attention_style='sparse',
             connection_style='dense',
-            layer_ordering='fna')
+            layer_ordering='fn',
+            in_logic=False,
+            out_logic=False)
     raise NotImplementedError
 
 
