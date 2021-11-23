@@ -322,6 +322,7 @@ class Transformer(tc.nn.Module):
         return None
 
     def _add_position_embeddings(self, inputs, prev_state):
+        assert type(prev_state) == list
         t1 = 0
         if prev_state is not None:
             if type(prev_state[0]) == list:
