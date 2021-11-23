@@ -322,7 +322,14 @@ class Transformer(tc.nn.Module):
         return None
 
     def _add_position_embeddings(self, inputs, prev_state):
-        t1 = 0 if prev_state is None else prev_state[0].shape[1]
+        t1 = 0
+        if prev_state is not None:
+            if type(prev_state[0]) == list:
+                t1 = len(prev_state[0])
+            elif type(prev_state[0]) == tc.Tensor:
+                t1 = prev_state[0].shape[1]
+            else:
+                raise TypeError
         t2 = inputs.shape[1]
         assert t1 + t2 <= self._n_context
         pos_embs = self._position_embeddings[t1:t1+t2, :]
