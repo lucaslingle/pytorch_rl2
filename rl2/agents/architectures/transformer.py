@@ -322,6 +322,39 @@ class Transformer(tc.nn.Module):
     def initial_state(self, batch_size):
         return None
 
+    def _add_position_embeddings(self, inputs, past_kvs):
+        if self._position_encoding_style == 'abs':
+            t1 = 0 if past_kvs[0] is None else past_kvs[0].shape[1]
+            t2 = inputs.shape[1]
+            assert t1 + t2 <= self._n_context
+            pos_embs = self._position_embeddings[t1:t1+t2, :]
+            pos_embs = pos_embs.unsqueeze(0)
+            if self._connection_style != 'dense':
+                inputs = inputs + pos_embs
+            else:
+                inputs = tc.cat((inputs, pos_embs), dim=-1)
+        return inputs
+
+    def _run_input_logic(self, inputs):
+        for letter in self._layer_ordering:
+            if letter == 'n':
+                if self._layer_ordering.index('n') > self._layer_ordering.index('f'):
+                    inputs = self._input_layer_norm(inputs)
+            elif letter == 'a':
+                if self._layer_ordering.index('a') > self._layer_ordering.index('f'):
+                    inputs = self._input_act(inputs)
+        return inputs
+
+    def _run_output_logic(self, inputs):
+        for letter in self._layer_ordering:
+            if letter == 'n':
+                if self._layer_ordering.index('n') < self._layer_ordering.index('f'):
+                    inputs = self._output_layer_norm(inputs)
+            elif letter == 'a':
+                if self._layer_ordering.index('a') < self._layer_ordering.index('f'):
+                    inputs = self._output_act(inputs)
+        return inputs
+
     def forward(self, inputs, prev_state=None):
         """
         Args:
@@ -338,49 +371,27 @@ class Transformer(tc.nn.Module):
         if len(list(inputs.shape)) == 2:
             inputs = inputs.unsqueeze(1)
 
-        past_kvs = [None] * self._n_layer if prev_state is None else prev_state
-
         # input
         inputs = self._input_proj(inputs)
-        if self._position_encoding_style == 'abs':
-            t1 = 0 if prev_state is None else prev_state[0].shape[1]
-            t2 = inputs.shape[1]
-            assert t1 + t2 <= self._n_context
-            pos_embs = self._position_embeddings[t1:t1+t2, :]
-            pos_embs = pos_embs.unsqueeze(0)
-            if self._connection_style != 'dense':
-                inputs = inputs + pos_embs
-            else:
-                inputs = tc.cat((inputs, pos_embs), dim=-1)
+        inputs = self._add_position_embeddings(inputs, prev_state)
         if self._in_logic:
-            for letter in self._layer_ordering:
-                if letter == 'n':
-                    if self._layer_ordering.index('n') > self._layer_ordering.index('f'):
-                        inputs = self._input_layer_norm(inputs)
-                elif letter == 'a':
-                    if self._layer_ordering.index('a') > self._layer_ordering.index('f'):
-                        inputs = self._input_act(inputs)
+            inputs = self._run_input_logic(inputs)
 
         # middle
-        new_kvs_by_layer = []
+        past_kvs = [None] * self._n_layer if prev_state is None else prev_state
+        new_kvs = []
         for l in range(0, self._n_layer):
-            inputs, new_kvs = self._transformer_layers[l](
+            inputs, new_kvs_l = self._transformer_layers[l](
                 inputs=inputs, past_kvs=past_kvs[l])
-            new_kvs_by_layer.append(new_kvs)
+            new_kvs.append(new_kvs_l)
 
         # output
         if self._out_logic:
-            for letter in self._layer_ordering:
-                if letter == 'n':
-                    if self._layer_ordering.index('n') < self._layer_ordering.index('f'):
-                        inputs = self._output_layer_norm(inputs)
-                elif letter == 'a':
-                    if self._layer_ordering.index('a') < self._layer_ordering.index('f'):
-                        inputs = self._output_act(inputs)
+            inputs = self._run_output_logic(inputs)
 
         features = inputs
 
         if features.shape[1] == 1:
             features = features.squeeze(1)
 
-        return features, new_kvs_by_layer
+        return features, new_kvs
