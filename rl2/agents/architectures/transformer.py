@@ -334,7 +334,7 @@ class Transformer(tc.nn.Module):
             if type(k) == list:
                 t1 = len(k)
             elif type(k) == tc.Tensor:
-                t1 = prev_state[0].shape[1]
+                t1 = k.shape[1]
             else:
                 raise TypeError
         t2 = inputs.shape[1]
