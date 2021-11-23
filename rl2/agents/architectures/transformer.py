@@ -321,8 +321,8 @@ class Transformer(tc.nn.Module):
     def initial_state(self, batch_size):
         return None
 
-    def _add_position_embeddings(self, inputs, past_kvs):
-        t1 = 0 if past_kvs[0] is None else past_kvs[0].shape[1]
+    def _add_position_embeddings(self, inputs, prev_state):
+        t1 = 0 if prev_state is None else prev_state[0].shape[1]
         t2 = inputs.shape[1]
         assert t1 + t2 <= self._n_context
         pos_embs = self._position_embeddings[t1:t1+t2, :]
