@@ -208,9 +208,9 @@ class Transformer(tc.nn.Module):
             attention_style,
             connection_style,
             layer_ordering,
-            activation=tc.nn.ReLU,
-            in_logic=True,
-            out_logic=True
+            input_logic='',
+            output_logic='',
+            activation=tc.nn.ReLU
     ):
         """
         Args:
@@ -223,11 +223,17 @@ class Transformer(tc.nn.Module):
             attention_style: one of 'full', 'sparse'.
             connection_style: one of 'plain', 'residual', 'dense'.
             layer_ordering: ordering of activation, function, and normalization.
-                should be letters chosen from 'a', 'f', 'n' in any order.
+                string should be letters chosen from 'a', 'f', 'n' in any order.
                 letter 'f' cannot be omitted.
+            input_logic: ordering of activation and normalization after
+                input linear projection and prior to first transformer layer.
+                string should be letters chosen from 'a', 'n' in any order.
+                string defaults to empty.
+            output_logic: ordering of activation and normalization before features
+                are returned and after last transformer layer.
+                string should be letters chosen from 'a', 'n' in any order.
+                string defaults to empty.
             activation: activation function to use in ff and anywhere else.
-            in_logic: apply layer ordering logic to input linear projection?
-            out_logic: apply layer ordering logic to output features?
         """
         assert position_encoding_style in ['abs', 'rel']
         assert attention_style in ['full', 'sparse']
@@ -235,6 +241,10 @@ class Transformer(tc.nn.Module):
         assert len(layer_ordering) == len(set(layer_ordering))
         assert set(layer_ordering) <= {'a', 'f', 'n'}
         assert 'f' in set(layer_ordering)
+        assert len(input_logic) == len(set(input_logic))
+        assert set(input_logic) <= {'a', 'n'}
+        assert len(output_logic) == len(set(output_logic))
+        assert set(output_logic) <= {'a', 'n'}
 
         super().__init__()
         self._input_dim = input_dim
@@ -245,22 +255,20 @@ class Transformer(tc.nn.Module):
         self._position_encoding_style = position_encoding_style
         self._connection_style = connection_style
         self._layer_ordering = list(layer_ordering)
+        self._input_logic = list(input_logic)
+        self._output_logic = list(output_logic)
         self._activation = activation
-        self._in_logic = in_logic
-        self._out_logic = out_logic
 
         # input
         self._input_proj = tc.nn.Linear(
             in_features=self._input_dim,
             out_features=self._feature_dim)
         tc.nn.init.xavier_normal_(self._input_proj.weight)
-        if self._in_logic:
-            if 'n' in self._layer_ordering:
-                if self._layer_ordering.index('n') > self._layer_ordering.index('f'):
-                    self._input_layer_norm = LayerNorm(units=self._feature_dim)
-            if 'a' in self._layer_ordering:
-                if self._layer_ordering.index('a') > self._layer_ordering.index('f'):
-                    self._input_act = self._activation()
+        if 'n' in self._input_logic:
+            self._input_layer_norm = LayerNorm(units=self._feature_dim)
+        if 'a' in self._input_logic:
+            self._input_act = self._activation()
+
         if self._position_encoding_style == 'abs':
             self._position_embeddings = sinusoidal_embeddings(
                 self._n_context, self._feature_dim, reverse=False)
@@ -281,13 +289,10 @@ class Transformer(tc.nn.Module):
         ])
 
         # output
-        if self._out_logic:
-            if 'n' in self._layer_ordering:
-                if self._layer_ordering.index('n') < self._layer_ordering.index('f'):
-                    self._output_layer_norm = LayerNorm(units=self.output_dim)
-            if 'a' in self._layer_ordering:
-                if self._layer_ordering.index('a') < self._layer_ordering.index('f'):
-                    self._output_act = self._activation()
+        if 'n' in self._output_logic:
+            self._output_layer_norm = LayerNorm(units=self.output_dim)
+        if 'a' in self._output_logic:
+            self._output_act = self._activation()
 
     def _get_input_dim(self, l):
         if self._connection_style != 'dense':
@@ -318,25 +323,26 @@ class Transformer(tc.nn.Module):
     def initial_state(self, batch_size):
         return None
 
-    def _add_position_embeddings(self, inputs, prev_state):
-        """
-        Args:
-            inputs: input tensor.
-            prev_state: optional layerwise list of tuples of keys and values.
-                the keys and values are each lists of tensors, or are tensors.
-        Returns:
-            output tensor.
-        """
+    def _get_past_len(self, prev_state):
         assert prev_state is None or type(prev_state) == list
         t1 = 0
         if prev_state is not None:
-            k, _ = prev_state[0]
+            k, _ = prev_state[0]  # layer 0, get keys
             if type(k) == list:
+                # during sampling MultiheadSelfAttention uses lists
+                # to avoid repeated tc.cat ops.
+                # improves for mem efficiency, 3x speedup
                 t1 = len(k)
             elif type(k) == tc.Tensor:
+                # during training MultiheadSelfAttention uses ordinary tensor
+                # could use list and cat it together once, but this is faster
                 t1 = k.shape[1]
             else:
                 raise TypeError
+        return t1
+
+    def _add_position_embeddings(self, inputs, prev_state):
+        t1 = self._get_past_len(prev_state)
         t2 = inputs.shape[1]
         assert t1 + t2 <= self._n_context
         pos_embs = self._position_embeddings[t1:t1+t2, :]
@@ -349,23 +355,19 @@ class Transformer(tc.nn.Module):
         return inputs
 
     def _run_input_logic(self, inputs):
-        for letter in self._layer_ordering:
+        for letter in self._input_logic:
             if letter == 'n':
-                if self._layer_ordering.index('n') > self._layer_ordering.index('f'):
-                    inputs = self._input_layer_norm(inputs)
+                inputs = self._input_layer_norm(inputs)
             elif letter == 'a':
-                if self._layer_ordering.index('a') > self._layer_ordering.index('f'):
-                    inputs = self._input_act(inputs)
+                inputs = self._input_act(inputs)
         return inputs
 
     def _run_output_logic(self, inputs):
-        for letter in self._layer_ordering:
+        for letter in self._output_logic:
             if letter == 'n':
-                if self._layer_ordering.index('n') < self._layer_ordering.index('f'):
-                    inputs = self._output_layer_norm(inputs)
+                inputs = self._output_layer_norm(inputs)
             elif letter == 'a':
-                if self._layer_ordering.index('a') < self._layer_ordering.index('f'):
-                    inputs = self._output_act(inputs)
+                inputs = self._output_act(inputs)
         return inputs
 
     def forward(self, inputs, prev_state=None):
@@ -386,8 +388,7 @@ class Transformer(tc.nn.Module):
 
         # input
         inputs = self._input_proj(inputs)
-        if self._in_logic:
-            inputs = self._run_input_logic(inputs)
+        inputs = self._run_input_logic(inputs)
         if self._position_encoding_style == 'abs':
             inputs = self._add_position_embeddings(inputs, prev_state)
 
@@ -400,11 +401,9 @@ class Transformer(tc.nn.Module):
             new_kvs.append(new_kvs_l)
 
         # output
-        if self._out_logic:
-            inputs = self._run_output_logic(inputs)
+        inputs = self._run_output_logic(inputs)
 
         features = inputs
-
         if features.shape[1] == 1:
             features = features.squeeze(1)
 

@@ -123,9 +123,7 @@ def create_architecture(architecture, input_dim, num_features, context_size):
             position_encoding_style='abs',
             attention_style='sparse',
             connection_style='dense',
-            layer_ordering='fn',
-            in_logic=False,
-            out_logic=False)
+            layer_ordering='fn')
     raise NotImplementedError
 
 
