@@ -58,7 +58,7 @@ def generate_meta_episode(
     h_tm1_policy_net = policy_net.initial_state(batch_size=1)
     h_tm1_value_net = value_net.initial_state(batch_size=1)
 
-    for t in range(0, meta_episode_length):
+    for t in range(0, meta_episode_len):
         pi_dist_t, h_t_policy_net = policy_net(
             curr_obs=tc.LongTensor(o_t),
             prev_action=tc.LongTensor(a_tm1),
