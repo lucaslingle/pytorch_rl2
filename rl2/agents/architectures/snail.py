@@ -7,7 +7,8 @@ from typing import Optional
 import torch as tc
 import numpy as np
 
-from rl2.agents.architectures.common import LayerNorm, MultiheadSelfAttention
+from rl2.agents.architectures.common.normalization import LayerNorm
+from rl2.agents.architectures.common.attention import MultiheadSelfAttention
 
 
 class CausalConv(tc.nn.Module):

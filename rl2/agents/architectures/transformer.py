@@ -4,9 +4,9 @@ Implements Transformer architectures for RL^2.
 
 import torch as tc
 
-from rl2.agents.architectures.common import (
+from rl2.agents.architectures.common.normalization import LayerNorm
+from rl2.agents.architectures.common.attention import (
     sinusoidal_embeddings,
-    LayerNorm,
     MultiheadSelfAttention,
 )
 
