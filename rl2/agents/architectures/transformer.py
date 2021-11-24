@@ -6,8 +6,8 @@ import torch as tc
 
 from rl2.agents.architectures.common.normalization import LayerNorm
 from rl2.agents.architectures.common.attention import (
-    sinusoidal_embeddings,
     MultiheadSelfAttention,
+    sinusoidal_embeddings
 )
 
 
