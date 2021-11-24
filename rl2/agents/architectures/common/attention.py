@@ -115,7 +115,7 @@ class MultiheadSelfAttention(tc.nn.Module):
                 tc.zeros(size=(self._num_heads * self._num_head_features,),
                          dtype=tc.float32))
 
-    def _attn_preop(self, qs, ks, vs, sampling):
+    def attn_preop(self, qs, ks, vs, sampling):
         assert type(qs) == type(ks) == type(vs)
         assert (sampling and type(qs) == list) or \
                (not sampling and type(qs) == tc.Tensor)
@@ -207,7 +207,7 @@ class MultiheadSelfAttention(tc.nn.Module):
 
         raise NotImplementedError
 
-    def _attn_postop(self, attn_out, input_len, sampling):
+    def attn_postop(self, attn_out, input_len, sampling):
         if self._attention_style == 'full':
             return attn_out
 
@@ -240,10 +240,10 @@ class MultiheadSelfAttention(tc.nn.Module):
 
         raise NotImplementedError
 
-    def _split_heads(self, inputs):
+    def split_heads(self, inputs):
         return tc.cat(tc.chunk(inputs, self._num_heads, dim=-1), dim=0)
 
-    def _merge_heads(self, inputs):
+    def merge_heads(self, inputs):
         return tc.cat(tc.chunk(inputs, self._num_heads, dim=0), dim=-1)
 
     def forward(self, inputs, past_kvs=None):
@@ -279,8 +279,8 @@ class MultiheadSelfAttention(tc.nn.Module):
                 vs = tc.cat((past_vs, vs), dim=1)
             new_kvs = (ks, vs)
 
-        qs, ks, vs, bsp = self._attn_preop(qs, ks, vs, sampling)  # [B', ..., H*F]
-        qs, ks, vs = map(self._split_heads, [qs, ks, vs])         # [B'*H, ..., F]
+        qs, ks, vs, bsp = self.attn_preop(qs, ks, vs, sampling)  # [B', ..., H*F]
+        qs, ks, vs = map(self.split_heads, [qs, ks, vs])         # [B'*H, ..., F]
 
         if self._position_encoding_style == 'rel':
             batch_size, src_len, d_model = bsp, ks.shape[1], inputs.shape[-1]
@@ -293,7 +293,7 @@ class MultiheadSelfAttention(tc.nn.Module):
             rs = tc.tile(rs.unsqueeze(0), [batch_size, 1, 1])    # [B', M, H*F]
             u_ = tc.tile(self._u.unsqueeze(0), [batch_size, 1])  # [B', H*F]
             v_ = tc.tile(self._v.unsqueeze(0), [batch_size, 1])  # [B', H*F]
-            rs, u_, v_ = map(self._split_heads, [rs, u_, v_])     # [B'*H, ..., F]
+            rs, u_, v_ = map(self.split_heads, [rs, u_, v_])     # [B'*H, ..., F]
 
             attn_output = relative_masked_self_attention(
                 qs, ks, vs, rs, u_, v_, use_mask=use_mask)   # [B'*H, T2', F]
@@ -301,8 +301,8 @@ class MultiheadSelfAttention(tc.nn.Module):
             attn_output = masked_self_attention(
                 qs, ks, vs, use_mask=use_mask)              # [B'*H, T2', F]
 
-        attn_output = self._merge_heads(attn_output)  # [B', T2', H*F]
-        attn_output = self._attn_postop(
+        attn_output = self.merge_heads(attn_output)  # [B', T2', H*F]
+        attn_output = self.attn_postop(
             attn_output,
             input_len=inputs.shape[1],
             sampling=sampling)  # [B, T2, H*F]
