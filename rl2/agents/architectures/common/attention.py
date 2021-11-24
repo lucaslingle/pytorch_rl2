@@ -264,7 +264,7 @@ class MultiheadSelfAttention(tc.nn.Module):
 
         if sampling:
             # unbind for memory-efficient append op
-            qs, ks, vs = list(map(lambda x: [x.squeeze(1)], [qs, ks, vs]))
+            qs, ks, vs = map(lambda x: [x.squeeze(1)], [qs, ks, vs])
             if past_kvs is not None:
                 past_ks, past_vs = past_kvs
                 past_ks.extend(ks)
@@ -280,7 +280,7 @@ class MultiheadSelfAttention(tc.nn.Module):
             new_kvs = (ks, vs)
 
         qs, ks, vs, bsp = self.attn_preop(qs, ks, vs, sampling)  # [B', ..., H*F]
-        qs, ks, vs = list(map(self.split_heads, [qs, ks, vs]))   # [B'*H, ..., F]
+        qs, ks, vs = map(self.split_heads, [qs, ks, vs])         # [B'*H, ..., F]
 
         if self._position_encoding_style == 'rel':
             batch_size, src_len, d_model = bsp, ks.shape[1], inputs.shape[-1]
@@ -293,8 +293,7 @@ class MultiheadSelfAttention(tc.nn.Module):
             rs = tc.tile(rs.unsqueeze(0), [batch_size, 1, 1])    # [B', M, H*F]
             u_ = tc.tile(self._u.unsqueeze(0), [batch_size, 1])  # [B', H*F]
             v_ = tc.tile(self._v.unsqueeze(0), [batch_size, 1])  # [B', H*F]
-
-            rs, u_, v_ = list(map(self.split_heads, [rs, u_, v_]))  # [B'*H, ..., F]
+            rs, u_, v_ = map(self.split_heads, [rs, u_, v_])     # [B'*H, ..., F]
 
             attn_output = relative_masked_self_attention(
                 qs, ks, vs, rs, u_, v_, use_mask=use_mask)   # [B'*H, T2', F]
