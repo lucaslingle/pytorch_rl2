@@ -263,20 +263,21 @@ class MultiheadSelfAttention(tc.nn.Module):
         qs, ks, vs = tc.chunk(qkv, 3, dim=-1)
 
         if sampling:
-            # unbind for memory efficient new_kvs append op
+            # unbind for memory-efficient append op
             qs, ks, vs = list(map(lambda x: [x.squeeze(1)], [qs, ks, vs]))
-
-        if past_kvs is not None:
-            past_ks, past_vs = past_kvs
-            if sampling:
+            if past_kvs is not None:
+                past_ks, past_vs = past_kvs
                 past_ks.extend(ks)
                 past_vs.extend(vs)
                 ks = past_ks
                 vs = past_vs
-            else:
+            new_kvs = (ks, vs)
+        else:
+            if past_kvs is not None:
+                past_ks, past_vs = past_kvs
                 ks = tc.cat((past_ks, ks), dim=1)
                 vs = tc.cat((past_vs, vs), dim=1)
-        new_kvs = (ks, vs)
+            new_kvs = (ks, vs)
 
         qs, ks, vs, bsp = self.attn_preop(qs, ks, vs, sampling)  # [B', ..., H*F]
         qs, ks, vs = list(map(self.split_heads, [qs, ks, vs]))   # [B'*H, ..., F]
