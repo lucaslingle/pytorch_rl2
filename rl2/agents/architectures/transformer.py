@@ -329,13 +329,8 @@ class Transformer(tc.nn.Module):
         if prev_state is not None:
             k, _ = prev_state[0]  # layer 0, get keys
             if type(k) == list:
-                # during sampling MultiheadSelfAttention uses lists
-                # to avoid repeated tc.cat ops.
-                # improves for mem efficiency, 3x speedup
                 t1 = len(k)
             elif type(k) == tc.Tensor:
-                # during training MultiheadSelfAttention uses ordinary tensor
-                # could use list and cat it together once, but this is faster
                 t1 = k.shape[1]
             else:
                 raise TypeError
