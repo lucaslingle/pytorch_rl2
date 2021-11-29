@@ -123,7 +123,7 @@ def create_architecture(architecture, input_dim, num_features, context_size):
     raise NotImplementedError
 
 
-def create_head(num_features, num_actions, head_type):
+def create_head(head_type, num_features, num_actions):
     if head_type == 'policy':
         return LinearPolicyHead(
             num_features=num_features,
@@ -135,8 +135,8 @@ def create_head(num_features, num_actions, head_type):
 
 
 def create_net(
-        environment, architecture, num_states, num_actions, num_features,
-        context_size, net_type
+        net_type, environment, architecture, num_states, num_actions,
+        num_features, context_size
 ):
     preprocessing = create_preprocessing(
         environment=environment,
@@ -148,9 +148,9 @@ def create_net(
         num_features=num_features,
         context_size=context_size)
     head = create_head(
+        head_type=net_type,
         num_features=architecture.output_dim,
-        num_actions=num_actions,
-        head_type=net_type)
+        num_actions=num_actions)
 
     if net_type == 'policy':
         return StatefulPolicyNet(
@@ -178,22 +178,22 @@ def main():
 
     # create learning system.
     policy_net = create_net(
+        net_type='policy',
         environment=args.environment,
         architecture=args.architecture,
         num_states=args.num_states,
         num_actions=args.num_actions,
         num_features=args.num_features,
-        context_size=args.meta_episode_len,
-        net_type='policy')
+        context_size=args.meta_episode_len)
 
     value_net = create_net(
+        net_type='value',
         environment=args.environment,
         architecture=args.architecture,
         num_states=args.num_states,
         num_actions=args.num_actions,
         num_features=args.num_features,
-        context_size=args.meta_episode_len,
-        net_type='value')
+        context_size=args.meta_episode_len)
 
     policy_optimizer = tc.optim.AdamW(
         get_weight_decay_param_groups(policy_net, args.adam_wd),
