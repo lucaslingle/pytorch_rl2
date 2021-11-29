@@ -204,10 +204,10 @@ class Transformer(tc.nn.Module):
             n_layer,
             n_head,
             n_context,
-            position_encoding_style,
-            attention_style,
-            connection_style,
-            layer_ordering,
+            position_encoding_style='abs',
+            attention_style='sparse',
+            connection_style='dense',
+            layer_ordering='fn',
             input_logic='',
             output_logic='',
             activation=tc.nn.ReLU
@@ -316,25 +316,16 @@ class Transformer(tc.nn.Module):
             small -= 1
         return small
 
-    @property
-    def output_dim(self):
-        return self._transformer_layers[-1].output_dim
-
-    def initial_state(self, batch_size):
-        return None
-
     def _get_past_len(self, prev_state):
-        assert prev_state is None or type(prev_state) == list
-        t1 = 0
-        if prev_state is not None:
-            k, _ = prev_state[0]  # layer 0, get keys
-            if type(k) == list:
-                t1 = len(k)
-            elif type(k) == tc.Tensor:
-                t1 = k.shape[1]
-            else:
-                raise TypeError
-        return t1
+        assert prev_state is None or isinstance(prev_state, list)
+        if prev_state is None:
+            return 0
+        k, _ = prev_state[0]  # layer 0, get keys
+        if isinstance(k, list):
+            return len(k)
+        if isinstance(k, tc.Tensor):
+            return k.shape[1]
+        raise NotImplementedError
 
     def _add_position_embeddings(self, inputs, prev_state):
         t1 = self._get_past_len(prev_state)
@@ -364,6 +355,13 @@ class Transformer(tc.nn.Module):
             elif letter == 'a':
                 inputs = self._output_act(inputs)
         return inputs
+
+    @property
+    def output_dim(self):
+        return self._transformer_layers[-1].output_dim
+
+    def initial_state(self, batch_size):
+        return None
 
     def forward(self, inputs, prev_state=None):
         """
