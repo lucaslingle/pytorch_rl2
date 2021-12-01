@@ -9,10 +9,9 @@ class LinearValueHead(tc.nn.Module):
     """
     Value head for a reinforcement learning agent.
     """
-    def __init__(self, num_features, use_wn=False):
+    def __init__(self, num_features):
         super().__init__()
         self._num_features = num_features
-        self._use_wn = use_wn
         self._linear = tc.nn.Linear(
             in_features=self._num_features,
             out_features=1,
