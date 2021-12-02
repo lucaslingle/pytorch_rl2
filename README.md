@@ -19,8 +19,7 @@ Install the following system dependencies:
 #### Ubuntu     
 ```bash
 sudo apt-get update
-sudo apt-get install -y libglu1-mesa-dev libgl1-mesa-dev libosmesa6-dev xvfb ffmpeg curl patchelf libglfw3 libglfw3-dev cmake zlib1g zlib1g-dev swig
-sudo apt-get install -y cmake libopenmpi-dev python3-dev zlib1g-dev
+sudo apt-get install -y cmake openmpi-bin openmpi-doc libopenmpi-dev
 ```
 
 #### Mac OS X
@@ -35,10 +34,10 @@ Install the conda package manager from https://docs.conda.io/en/latest/miniconda
 
 Then run
 ```bash
-conda create --name rl2_mdp python=3.8.1
-conda activate rl2_mdp
-git clone https://github.com/lucaslingle/pytorch_rl2_mdp_lstm
-cd pytorch_rl2_mdp_lstm
+conda create --name pytorch_rl2 python=3.8.1
+conda activate pytorch_rl2
+git clone https://github.com/lucaslingle/pytorch_rl2
+cd pytorch_rl2
 pip install -e .
 ```
 
@@ -52,7 +51,7 @@ mpirun -np 8 python -m train
 
 This will launch 8 parallel processes, each running the ```train.py``` script. These processes each generate meta-episodes separately and then synchronously train on the collected experience in a data-parallel manner, with gradient information and model parameters synchronized across processes using mpi4py.
 
-To see additional configuration options, you can simply type ```python train.py --help```. Among other options, we support various architectures: GRU, LSTM, SNAIL, and TrXL-I.
+To see additional configuration options, you can simply type ```python train.py --help```. Among other options, we support various architectures including GRU, LSTM, SNAIL, and Transformer models.
 
 ### Checkpoints
 By default, checkpoints are saved to ```./checkpoints/defaults```. To pick a different checkpoint directory during training, 
@@ -61,7 +60,7 @@ you can set the ```--checkpoint_dir``` flag, and to pick a different checkpoint 
 
 ## Reproducing the Papers
 
-Our implementations matched or exceeded the published performance of RL^2 GRU (Duan et al., 2016) and RL^2 SNAIL (Mishra et al., 2017) in every setting we tested.
+Our implementations closely matched or slightly exceeded the published performance of RL^2 GRU (Duan et al., 2016) and RL^2 SNAIL (Mishra et al., 2017) in every setting we tested.
 
 In the tables below, ```n``` is the number of episodes per meta-episode, and ```k``` is the number of actions. 
 Following Duan et al., 2016 and Mishra et al., 2017, in our tabular MDP experiments, all MDPs have 10 states and 5 actions, and the episode length is 10.  
@@ -71,9 +70,9 @@ Following Duan et al., 2016 and Mishra et al., 2017, in our tabular MDP experime
 | Setup      | Random | Gittins |    TS |   OTS |  UCB1 | eps-Greedy | Greedy | RL^2 GRU (paper) | RL^2 GRU (ours) | RL^2 SNAIL (paper) | RL^2 SNAIL (ours)  |
 | ---------- | ------ | ------- | ----- | ----- | ----- | ---------- | ------ | ---------------- | --------------- | ------------------ | ------------------ |
 |  n=10,k=5  |    5.0 |     6.6 |   5.7 |   6.5 |   6.7 |        6.6 |    6.6 |              6.7 |            6.7  |                6.6 |                6.8 |
-|  n=10,k=10 |    5.0 |     6.6 |   5.5 |   6.2 |   6.7 |        6.6 |    6.6 |              6.7 |                 |                6.7 |                    | 
-|  n=10,k=50 |    5.1 |     6.5 |   5.2 |   5.5 |   6.6 |        6.5 |    6.5 |              6.8 |                 |                6.7 |                    | 
-| n=100,k=5  |   49.9 |    78.3 |  74.7 |  77.9 |  78.0 |       75.4 |   74.8 |             78.7 |            78.7 |               79.1 |                    |
+|  n=10,k=10 |    5.0 |     6.6 |   5.5 |   6.2 |   6.7 |        6.6 |    6.6 |              6.7 |                 |                6.7 |                    |
+|  n=10,k=50 |    5.1 |     6.5 |   5.2 |   5.5 |   6.6 |        6.5 |    6.5 |              6.8 |                 |                6.7 |                    |
+| n=100,k=5  |   49.9 |    78.3 |  74.7 |  77.9 |  78.0 |       75.4 |   74.8 |             78.7 |            78.7 |               79.1 |               78.5 |
 | n=100,k=10 |   49.9 |    82.8 |  76.7 |  81.4 |  82.4 |       77.4 |   77.1 |             83.5 |                 |               83.5 |                    |
 | n=100,k=50 |   49.8 |    85.2 |  64.5 |  67.7 |  84.3 |       78.3 |   78.0 |             84.9 |                 |               85.1 |                    |
 | n=500,k=5  |  249.8 |   405.8 | 402.0 | 406.7 | 405.8 |      388.2 |  380.6 |            401.6 |                 |              408.1 |                    |
@@ -94,3 +93,5 @@ To perform policy optimization, we used PPO. We used layer norm instead of weigh
 
 In all cases, for training we used a configuration where the total number of observations per policy improvement phase was equal to 240,000. This is comparable to the 250,000 used in prior works.
 The per-process batch size was 60 trajectories. There were 8 processes. There were 8 PPO optimization epochs per policy improvement phase. 
+
+All other hyperparameters were set to their default values in the ```train.py``` script, except for the SNAIL experiments, where we used ```--num_features=32``` due to the skip-connections. 

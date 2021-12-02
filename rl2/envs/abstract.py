@@ -10,6 +10,14 @@ ObsType = TypeVar('ObsType')
 
 
 class MetaEpisodicEnv(abc.ABC, Generic[ObsType]):
+    @property
+    @abc.abstractmethod
+    def max_episode_len(self) -> int:
+        """
+        Return the maximum episode length.
+        """
+        pass
+
     @abc.abstractmethod
     def new_env(self) -> None:
         """

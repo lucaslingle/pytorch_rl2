@@ -6,7 +6,7 @@ from typing import Tuple
 
 import torch as tc
 
-from rl2.agents.architectures.common import LayerNorm
+from rl2.agents.architectures.common.normalization import LayerNorm
 
 
 class GRU(tc.nn.Module):

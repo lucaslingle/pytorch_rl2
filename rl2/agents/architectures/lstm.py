@@ -6,7 +6,7 @@ from typing import Tuple
 
 import torch as tc
 
-from rl2.agents.architectures.common import LayerNorm
+from rl2.agents.architectures.common.normalization import LayerNorm
 
 
 class LSTM(tc.nn.Module):
@@ -27,7 +27,7 @@ class LSTM(tc.nn.Module):
             in_features=self._input_dim,
             out_features=(4 * self._hidden_dim),
             bias=(not self._use_ln))
-        tc.nn.init.uniform_(self._x2fioj.weight, -0.10, 0.10)
+        tc.nn.init.xavier_normal_(self._x2fioj.weight)
         if not self._use_ln:
             tc.nn.init.zeros_(self._x2fioj.bias)
 
@@ -35,12 +35,11 @@ class LSTM(tc.nn.Module):
             in_features=self._hidden_dim,
             out_features=(4 * self._hidden_dim),
             bias=False)
-        tc.nn.init.uniform_(self._x2fioj.weight, -0.10, 0.10)
+        tc.nn.init.xavier_normal_(self._h2fioj.weight)
 
         if self._use_ln:
             self._x2fioj_ln = LayerNorm(units=(4 * self._hidden_dim))
             self._h2fioj_ln = LayerNorm(units=(4 * self._hidden_dim))
-            self._c_out_ln = LayerNorm(units=self._hidden_dim)
 
         self._initial_state = tc.zeros(2 * self._hidden_dim)
 
@@ -94,7 +93,7 @@ class LSTM(tc.nn.Module):
             o = tc.nn.Sigmoid()(o)
             j = tc.nn.ReLU()(j)
             c_new = f * c_prev + i * j
-            h_new = o * (self._c_out_ln(c_new) if self._use_ln else c_new)
+            h_new = o * c_new
 
             features_by_timestep.append(h_new)
             state = tc.cat((h_new, c_new), dim=-1)
