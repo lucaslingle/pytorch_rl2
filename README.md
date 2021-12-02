@@ -34,10 +34,10 @@ Install the conda package manager from https://docs.conda.io/en/latest/miniconda
 
 Then run
 ```bash
-conda create --name rl2_mdp python=3.8.1
-conda activate rl2_mdp
-git clone https://github.com/lucaslingle/pytorch_rl2_mdp_lstm
-cd pytorch_rl2_mdp_lstm
+conda create --name pytorch_rl2 python=3.8.1
+conda activate pytorch_rl2
+git clone https://github.com/lucaslingle/pytorch_rl2
+cd pytorch_rl2
 pip install -e .
 ```
 
@@ -51,7 +51,7 @@ mpirun -np 8 python -m train
 
 This will launch 8 parallel processes, each running the ```train.py``` script. These processes each generate meta-episodes separately and then synchronously train on the collected experience in a data-parallel manner, with gradient information and model parameters synchronized across processes using mpi4py.
 
-To see additional configuration options, you can simply type ```python train.py --help```. Among other options, we support various architectures: GRU, LSTM, SNAIL, and Transformer-XL.
+To see additional configuration options, you can simply type ```python train.py --help```. Among other options, we support various architectures including GRU, LSTM, SNAIL, and Transformer models.
 
 ### Checkpoints
 By default, checkpoints are saved to ```./checkpoints/defaults```. To pick a different checkpoint directory during training, 
