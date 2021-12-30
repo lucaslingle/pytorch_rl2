@@ -3,7 +3,7 @@ Script for training stateful meta-reinforcement learning agents
 """
 
 import argparse
-from functools import partial
+import os
 
 import torch as tc
 
@@ -21,9 +21,7 @@ from rl2.agents.integration.policy_net import StatefulPolicyNet
 from rl2.agents.integration.value_net import StatefulValueNet
 from rl2.algos.ppo import training_loop
 
-from rl2.utils.checkpoint_util import maybe_load_checkpoint, save_checkpoint
-from rl2.utils.comm_util import get_comm, sync_state
-from rl2.utils.constants import ROOT_RANK
+from rl2.utils.checkpoint_util import maybe_load_checkpoints, save_checkpoints
 from rl2.utils.optim_util import get_weight_decay_param_groups
 
 
@@ -63,7 +61,6 @@ def create_argparser():
     parser.add_argument("--ppo_ent_coef", type=float, default=0.01)
     parser.add_argument("--discount_gamma", type=float, default=0.99)
     parser.add_argument("--gae_lambda", type=float, default=0.3)
-    parser.add_argument("--standardize_advs", type=int, choices=[0,1], default=0)
     parser.add_argument("--adam_lr", type=float, default=2e-4)
     parser.add_argument("--adam_eps", type=float, default=1e-5)
     parser.add_argument("--adam_wd", type=float, default=0.01)
@@ -165,9 +162,13 @@ def create_net(
     raise NotImplementedError
 
 
-def main():
-    args = create_argparser().parse_args()
-    comm = get_comm()
+def setup(rank, args):
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12345'
+    tc.distributed.init_process_group(
+        backend=args.backend,
+        world_size=args.world_size,
+        rank=rank)
 
     # create env.
     env = create_env(
@@ -177,6 +178,7 @@ def main():
         max_episode_len=args.max_episode_len)
 
     # create learning system.
+    device = "cpu"
     policy_net = create_net(
         net_type='policy',
         environment=args.environment,
@@ -185,7 +187,6 @@ def main():
         num_actions=args.num_actions,
         num_features=args.num_features,
         context_size=args.meta_episode_len)
-
     value_net = create_net(
         net_type='value',
         environment=args.environment,
@@ -208,92 +209,59 @@ def main():
     value_scheduler = None
 
     # load checkpoint, if applicable.
-    pol_iters_so_far = 0
-    if comm.Get_rank() == ROOT_RANK:
-        a = maybe_load_checkpoint(
-            checkpoint_dir=args.checkpoint_dir,
-            model_name=f"{args.model_name}/policy_net",
-            model=policy_net,
-            optimizer=policy_optimizer,
-            scheduler=policy_scheduler,
-            steps=None)
+    checkpoint_dir = os.path.join(args.models_dir, f"{args.run_name}")
+    a = maybe_load_checkpoints(
+        checkpoint_dir=checkpoint_dir,
+        checkpointables={
+            'policy_net': policy_net,
+            'policy_optimizer': policy_optimizer,
+            'policy_scheduler': policy_scheduler
+        },
+        map_location=device,
+        steps=None)
+    b = maybe_load_checkpoints(
+        checkpoint_dir=checkpoint_dir,
+        checkpointables={
+            'value_net': value_net,
+            'value_optimizer': value_optimizer,
+            'value_scheduler': value_scheduler
+        },
+        map_location=device,
+        steps=None)
+    if a != b:
+        msg = "Policy and value iterates not aligned in latest checkpoint!"
+        raise RuntimeError(msg)
 
-        b = maybe_load_checkpoint(
-            checkpoint_dir=args.checkpoint_dir,
-            model_name=f"{args.model_name}/value_net",
-            model=value_net,
-            optimizer=value_optimizer,
-            scheduler=value_scheduler,
-            steps=None)
+    return {
+        "env": env,
+        "policy_net": policy_net,
+        "policy_optimizer": policy_optimizer,
+        "policy_scheduler": policy_scheduler,
+        "value_net": value_net,
+        "value_optimizer": value_optimizer,
+        "value_scheduler": value_scheduler,
+        "pol_iters_so_far": a
+    }
 
-        if a != b:
-            raise RuntimeError(
-                "Policy and value iterates not aligned in latest checkpoint!")
-        pol_iters_so_far = a
 
-    # sync state.
-    pol_iters_so_far = comm.bcast(pol_iters_so_far, root=ROOT_RANK)
-    sync_state(
-        model=policy_net,
-        optimizer=policy_optimizer,
-        scheduler=policy_scheduler,
-        comm=comm,
-        root=ROOT_RANK)
-    sync_state(
-        model=value_net,
-        optimizer=value_optimizer,
-        scheduler=value_scheduler,
-        comm=comm,
-        root=ROOT_RANK)
+def cleanup():
+    tc.distributed.destroy_process_group()
 
-    # make callback functions for checkpointing.
-    policy_checkpoint_fn = partial(
-        save_checkpoint,
-        checkpoint_dir=args.checkpoint_dir,
-        model_name=f"{args.model_name}/policy_net",
-        model=policy_net,
-        optimizer=policy_optimizer,
-        scheduler=policy_scheduler)
 
-    value_checkpoint_fn = partial(
-        save_checkpoint,
-        checkpoint_dir=args.checkpoint_dir,
-        model_name=f"{args.model_name}/value_net",
-        model=value_net,
-        optimizer=value_optimizer,
-        scheduler=value_scheduler)
+def train(rank, args):
+    learning_system = setup(rank, args)
 
-    # run it!
     if args.meta_episodes_per_policy_update == -1:
         numer = 240000
-        denom = comm.Get_size() * args.meta_episode_len
-        meta_episodes_per_policy_update = numer // denom
-    else:
-        meta_episodes_per_policy_update = args.meta_episodes_per_policy_update
+        denom = args.world_size * args.meta_episode_len
+        args.meta_episodes_per_policy_update = numer // denom
 
-    training_loop(
-        env=env,
-        policy_net=policy_net,
-        value_net=value_net,
-        policy_optimizer=policy_optimizer,
-        value_optimizer=value_optimizer,
-        policy_scheduler=policy_scheduler,
-        value_scheduler=value_scheduler,
-        meta_episodes_per_policy_update=meta_episodes_per_policy_update,
-        meta_episodes_per_learner_batch=args.meta_episodes_per_learner_batch,
-        meta_episode_len=args.meta_episode_len,
-        ppo_opt_epochs=args.ppo_opt_epochs,
-        ppo_clip_param=args.ppo_clip_param,
-        ppo_ent_coef=args.ppo_ent_coef,
-        discount_gamma=args.discount_gamma,
-        gae_lambda=args.gae_lambda,
-        standardize_advs=bool(args.standardize_advs),
-        max_pol_iters=args.max_pol_iters,
-        pol_iters_so_far=pol_iters_so_far,
-        policy_checkpoint_fn=policy_checkpoint_fn,
-        value_checkpoint_fn=value_checkpoint_fn,
-        comm=comm)
+    training_loop(rank, **learning_system, **vars(args))
+    cleanup()
 
 
 if __name__ == '__main__':
-    main()
+    args = create_argparser().parse_args()
+    tc.multiprocessing.spawn(
+        fn=train, args=(args,), nprocs=args.world_size, join=True
+    )
