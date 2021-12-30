@@ -176,9 +176,9 @@ def setup(rank, args):
         max_episode_len=args.max_episode_len)
 
     # create learning system.
-    device = 'cpu'
     policy_net = create_net('policy', **vars(args))
     value_net = create_net('value', **vars(args))
+
     policy_optimizer = tc.optim.AdamW(
         get_weight_decay_param_groups(policy_net, args.adam_wd),
         lr=args.adam_lr,
@@ -187,6 +187,7 @@ def setup(rank, args):
         get_weight_decay_param_groups(value_net, args.adam_wd),
         lr=args.adam_lr,
         eps=args.adam_eps)
+
     policy_scheduler = None
     value_scheduler = None
 
@@ -199,7 +200,7 @@ def setup(rank, args):
             'policy_optimizer': policy_optimizer,
             'policy_scheduler': policy_scheduler
         },
-        map_location=device,
+        map_location='cpu',
         steps=None)
     b = maybe_load_checkpoints(
         checkpoint_dir=checkpoint_dir,
@@ -208,7 +209,7 @@ def setup(rank, args):
             'value_optimizer': value_optimizer,
             'value_scheduler': value_scheduler
         },
-        map_location=device,
+        map_location='cpu',
         steps=None)
     if a != b:
         msg = 'Policy and value iterates not aligned in latest checkpoint!'
