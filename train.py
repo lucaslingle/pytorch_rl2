@@ -135,6 +135,7 @@ def create_net(
         net_type, environment_name, architecture, num_states, num_actions,
         num_features, context_size, **kwargs
 ):
+    assert net_type in ['policy', 'value']
     preprocessing = create_preprocessing(
         environment_name=environment_name,
         num_states=num_states,
@@ -149,17 +150,9 @@ def create_net(
         num_features=architecture.output_dim,
         num_actions=num_actions)
 
-    if net_type == 'policy':
-        return StatefulPolicyNet(
-            preprocessing=preprocessing,
-            architecture=architecture,
-            policy_head=head)
-    if net_type == 'value':
-        return StatefulValueNet(
-            preprocessing=preprocessing,
-            architecture=architecture,
-            value_head=head)
-    raise NotImplementedError
+    cls = {'policy': StatefulPolicyNet, 'value': StatefulValueNet}[net_type]
+    net = cls(preprocessing, architecture, head)
+    return tc.nn.parallel.DistributedDataParallel(net)
 
 
 def setup(rank, args):
