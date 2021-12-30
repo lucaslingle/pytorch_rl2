@@ -2,6 +2,7 @@
 *~
 .idea/
 checkpoints/
+models_dir/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
