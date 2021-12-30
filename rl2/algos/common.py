@@ -6,9 +6,11 @@ stateful meta-reinforcement learning agents.
 import torch as tc
 import numpy as np
 
-from rl2.envs.abstract import MetaEpisodicEnv
-from rl2.agents.integration.policy_net import StatefulPolicyNet
-from rl2.agents.integration.value_net import StatefulValueNet
+from rl2.utils.typing_util import (
+    MetaEpisodicEnv,
+    StatefulPolicyNet,
+    StatefulValueNet
+)
 
 
 class MetaEpisode:
