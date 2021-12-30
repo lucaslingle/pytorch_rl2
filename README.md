@@ -15,21 +15,6 @@ This theoretical background of RL^2 is discussed by Ortega et al., 2019 and a co
 
 ## Getting Started
 
-Install the following system dependencies:
-#### Ubuntu     
-```bash
-sudo apt-get update
-sudo apt-get install -y cmake openmpi-bin openmpi-doc libopenmpi-dev
-```
-
-#### Mac OS X
-Installation of the system packages on Mac requires [Homebrew](https://brew.sh). With Homebrew installed, run the following:
-```bash
-brew install cmake openmpi
-```
-
-#### Everyone
-Once the system dependencies have been installed, it's time to install the python dependencies. 
 Install the conda package manager from https://docs.conda.io/en/latest/miniconda.html
 
 Then run
@@ -44,19 +29,23 @@ pip install -e .
 ## Usage
 
 ### Training
-To train the default settings, you can simply type:
+To train a Sparse Transformer model in the MDP setting, you can run
 ```bash
-mpirun -np 8 python -m train
+python -m script \
+    --world_size=8 \
+    --environment_name=tabular_mdp \
+    --architecture=transformer \
+    --num_features=32
 ```
 
-This will launch 8 parallel processes, each running the ```train.py``` script. These processes each generate meta-episodes separately and then synchronously train on the collected experience in a data-parallel manner, with gradient information and model parameters synchronized across processes using mpi4py.
+This will launch 8 parallel processes, each running the ```train.py``` script. These processes each generate meta-episodes separately and then synchronously train on the collected experience in a data-parallel manner, with gradient information and model parameters synchronized across processes using Torch DDP.
 
 To see additional configuration options, you can simply type ```python train.py --help```. Among other options, we support various architectures including GRU, LSTM, SNAIL, and Transformer models.
 
 ### Checkpoints
-By default, checkpoints are saved to ```./checkpoints/defaults```. To pick a different checkpoint directory during training, 
-you can set the ```--checkpoint_dir``` flag, and to pick a different checkpoint name, you can set the 
-```--model_name``` flag.
+By default, checkpoints are saved to ```./models_dir/defaults```. To pick a different checkpoint directory during training, 
+you can set the ```--models_dir``` flag, and to pick a different checkpoint name, you can set the 
+```--run_name``` flag.
 
 ## Reproducing the Papers
 

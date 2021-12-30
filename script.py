@@ -19,6 +19,7 @@ from rl2.agents.heads.policy_heads import LinearPolicyHead
 from rl2.agents.heads.value_heads import LinearValueHead
 from rl2.agents.integration.policy_net import StatefulPolicyNet
 from rl2.agents.integration.value_net import StatefulValueNet
+from rl2.agents.integration.ddp import StatefulDDP
 from rl2.algos.ppo import training_loop
 
 from rl2.utils.checkpoint_util import maybe_load_checkpoints
@@ -28,6 +29,11 @@ from rl2.utils.optim_util import get_weight_decay_param_groups
 def create_argparser():
     parser = argparse.ArgumentParser(
         description="""Training script for RL^2.""")
+
+    ### Distributed Training and Persistence
+    parser.add_argument("--world_size", type=int, default=8)
+    parser.add_argument("--models_dir", type=str, default='models_dir')
+    parser.add_argument("--run_name", type=str, default='defaults')
 
     ### Environment
     parser.add_argument("--environment_name", choices=['bandit', 'tabular_mdp'],
@@ -46,10 +52,6 @@ def create_argparser():
         "--architecture", choices=['gru', 'lstm', 'snail', 'transformer'],
         default='gru')
     parser.add_argument("--num_features", type=int, default=256)
-
-    ### Checkpointing
-    parser.add_argument("--model_name", type=str, default='defaults')
-    parser.add_argument("--checkpoint_dir", type=str, default='checkpoints')
 
     ### Training
     parser.add_argument("--max_pol_iters", type=int, default=12000)
@@ -90,7 +92,7 @@ def create_preprocessing(environment_name, num_states, num_actions):
     raise NotImplementedError
 
 
-def create_architecture(architecture, input_dim, num_features, context_size):
+def create_architecture(architecture, input_dim, num_features, meta_episode_len):
     if architecture == 'gru':
         return GRU(
             input_dim=input_dim,
@@ -108,7 +110,7 @@ def create_architecture(architecture, input_dim, num_features, context_size):
         return SNAIL(
             input_dim=input_dim,
             feature_dim=num_features,
-            context_size=context_size,
+            context_size=meta_episode_len,
             use_ln=True)
     if architecture == 'transformer':
         return Transformer(
@@ -116,7 +118,7 @@ def create_architecture(architecture, input_dim, num_features, context_size):
             feature_dim=num_features,
             n_layer=9,
             n_head=2,
-            n_context=context_size)
+            n_context=meta_episode_len)
     raise NotImplementedError
 
 
@@ -133,7 +135,7 @@ def create_head(head_type, num_features, num_actions):
 
 def create_net(
         net_type, environment_name, architecture, num_states, num_actions,
-        num_features, context_size, **kwargs
+        num_features, meta_episode_len, **kwargs
 ):
     assert net_type in ['policy', 'value']
     preprocessing = create_preprocessing(
@@ -144,15 +146,14 @@ def create_net(
         architecture=architecture,
         input_dim=preprocessing.output_dim,
         num_features=num_features,
-        context_size=context_size)
+        meta_episode_len=meta_episode_len)
     head = create_head(
         head_type=net_type,
         num_features=architecture.output_dim,
         num_actions=num_actions)
 
     cls = {'policy': StatefulPolicyNet, 'value': StatefulValueNet}[net_type]
-    net = cls(preprocessing, architecture, head)
-    return tc.nn.parallel.DistributedDataParallel(net)
+    return StatefulDDP(cls(preprocessing, architecture, head))
 
 
 def setup(rank, args):
@@ -185,9 +186,9 @@ def setup(rank, args):
     value_scheduler = None
 
     # load checkpoint, if applicable.
-    checkpoint_dir = os.path.join(args.models_dir, f"{args.run_name}")
+    args.checkpoint_dir = os.path.join(args.models_dir, f"{args.run_name}")
     a = maybe_load_checkpoints(
-        checkpoint_dir=checkpoint_dir,
+        checkpoint_dir=args.checkpoint_dir,
         checkpointables={
             'policy_net': policy_net,
             'policy_optimizer': policy_optimizer,
@@ -196,7 +197,7 @@ def setup(rank, args):
         map_location='cpu',
         steps=None)
     b = maybe_load_checkpoints(
-        checkpoint_dir=checkpoint_dir,
+        checkpoint_dir=args.checkpoint_dir,
         checkpointables={
             'value_net': value_net,
             'value_optimizer': value_optimizer,
