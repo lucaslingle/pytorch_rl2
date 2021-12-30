@@ -21,7 +21,7 @@ from rl2.agents.integration.policy_net import StatefulPolicyNet
 from rl2.agents.integration.value_net import StatefulValueNet
 from rl2.algos.ppo import training_loop
 
-from rl2.utils.checkpoint_util import maybe_load_checkpoints, save_checkpoints
+from rl2.utils.checkpoint_util import maybe_load_checkpoints
 from rl2.utils.optim_util import get_weight_decay_param_groups
 
 
@@ -166,9 +166,7 @@ def setup(rank, args):
     os.environ['MASTER_ADDR'] = 'localhost'
     os.environ['MASTER_PORT'] = '12345'
     tc.distributed.init_process_group(
-        backend=args.backend,
-        world_size=args.world_size,
-        rank=rank)
+        backend='gloo', rank=rank, world_size=args.world_size)
 
     # create env.
     env = create_env(
@@ -178,7 +176,7 @@ def setup(rank, args):
         max_episode_len=args.max_episode_len)
 
     # create learning system.
-    device = "cpu"
+    device = 'cpu'
     policy_net = create_net(
         net_type='policy',
         environment=args.environment,
@@ -229,18 +227,18 @@ def setup(rank, args):
         map_location=device,
         steps=None)
     if a != b:
-        msg = "Policy and value iterates not aligned in latest checkpoint!"
+        msg = 'Policy and value iterates not aligned in latest checkpoint!'
         raise RuntimeError(msg)
 
     return {
-        "env": env,
-        "policy_net": policy_net,
-        "policy_optimizer": policy_optimizer,
-        "policy_scheduler": policy_scheduler,
-        "value_net": value_net,
-        "value_optimizer": value_optimizer,
-        "value_scheduler": value_scheduler,
-        "pol_iters_so_far": a
+        'env': env,
+        'policy_net': policy_net,
+        'policy_optimizer': policy_optimizer,
+        'policy_scheduler': policy_scheduler,
+        'value_net': value_net,
+        'value_optimizer': value_optimizer,
+        'value_scheduler': value_scheduler,
+        'pol_iters_so_far': a
     }
 
 
