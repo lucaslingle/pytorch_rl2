@@ -133,7 +133,7 @@ def create_head(head_type, num_features, num_actions):
 
 def create_net(
         net_type, environment, architecture, num_states, num_actions,
-        num_features, context_size
+        num_features, context_size, **kwargs
 ):
     preprocessing = create_preprocessing(
         environment=environment,
@@ -177,22 +177,8 @@ def setup(rank, args):
 
     # create learning system.
     device = 'cpu'
-    policy_net = create_net(
-        net_type='policy',
-        environment=args.environment,
-        architecture=args.architecture,
-        num_states=args.num_states,
-        num_actions=args.num_actions,
-        num_features=args.num_features,
-        context_size=args.meta_episode_len)
-    value_net = create_net(
-        net_type='value',
-        environment=args.environment,
-        architecture=args.architecture,
-        num_states=args.num_states,
-        num_actions=args.num_actions,
-        num_features=args.num_features,
-        context_size=args.meta_episode_len)
+    policy_net = create_net('policy', **vars(args))
+    value_net = create_net('value', **vars(args))
 
     policy_optimizer = tc.optim.AdamW(
         get_weight_decay_param_groups(policy_net, args.adam_wd),
