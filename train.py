@@ -30,7 +30,7 @@ def create_argparser():
         description="""Training script for RL^2.""")
 
     ### Environment
-    parser.add_argument("--environment", choices=['bandit', 'tabular_mdp'],
+    parser.add_argument("--environment_name", choices=['bandit', 'tabular_mdp'],
                         default='bandit')
     parser.add_argument("--num_states", type=int, default=10,
                         help="Ignored if environment is bandit.")
@@ -67,11 +67,11 @@ def create_argparser():
     return parser
 
 
-def create_env(environment, num_states, num_actions, max_episode_len):
-    if environment == 'bandit':
+def create_env(environment_name, num_states, num_actions, max_episode_len):
+    if environment_name == 'bandit':
         return BanditEnv(
             num_actions=num_actions)
-    if environment == 'tabular_mdp':
+    if environment_name == 'tabular_mdp':
         return MDPEnv(
             num_states=num_states,
             num_actions=num_actions,
@@ -79,11 +79,11 @@ def create_env(environment, num_states, num_actions, max_episode_len):
     raise NotImplementedError
 
 
-def create_preprocessing(environment, num_states, num_actions):
-    if environment == 'bandit':
+def create_preprocessing(environment_name, num_states, num_actions):
+    if environment_name == 'bandit':
         return MABPreprocessing(
             num_actions=num_actions)
-    if environment == 'tabular_mdp':
+    if environment_name == 'tabular_mdp':
         return MDPPreprocessing(
             num_states=num_states,
             num_actions=num_actions)
@@ -132,11 +132,11 @@ def create_head(head_type, num_features, num_actions):
 
 
 def create_net(
-        net_type, environment, architecture, num_states, num_actions,
+        net_type, environment_name, architecture, num_states, num_actions,
         num_features, context_size, **kwargs
 ):
     preprocessing = create_preprocessing(
-        environment=environment,
+        environment_name=environment_name,
         num_states=num_states,
         num_actions=num_actions)
     architecture = create_architecture(
@@ -170,7 +170,7 @@ def setup(rank, args):
 
     # create env.
     env = create_env(
-        environment=args.environment,
+        environment_name=args.environment_name,
         num_states=args.num_states,
         num_actions=args.num_actions,
         max_episode_len=args.max_episode_len)
@@ -179,7 +179,6 @@ def setup(rank, args):
     device = 'cpu'
     policy_net = create_net('policy', **vars(args))
     value_net = create_net('value', **vars(args))
-
     policy_optimizer = tc.optim.AdamW(
         get_weight_decay_param_groups(policy_net, args.adam_wd),
         lr=args.adam_lr,
@@ -188,7 +187,6 @@ def setup(rank, args):
         get_weight_decay_param_groups(value_net, args.adam_wd),
         lr=args.adam_lr,
         eps=args.adam_eps)
-
     policy_scheduler = None
     value_scheduler = None
 
