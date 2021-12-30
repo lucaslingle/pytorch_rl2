@@ -186,7 +186,7 @@ def setup(rank, args):
     value_scheduler = None
 
     # load checkpoint, if applicable.
-    args.checkpoint_dir = os.path.join(args.models_dir, f"{args.run_name}")
+    args.checkpoint_dir = os.path.join(args.models_dir, args.run_name)
     a = maybe_load_checkpoints(
         checkpoint_dir=args.checkpoint_dir,
         checkpointables={
