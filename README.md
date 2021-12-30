@@ -82,5 +82,3 @@ To perform policy optimization, we used PPO. We used layer norm instead of weigh
 
 In all cases, for training we used a configuration where the total number of observations per policy improvement phase was equal to 240,000. This is comparable to the 250,000 used in prior works.
 The per-process batch size was 60 trajectories. There were 8 processes. There were 8 PPO optimization epochs per policy improvement phase. 
-
-All other hyperparameters were set to their default values in the ```train.py``` script, except for the SNAIL experiments, where we used ```--num_features=32``` due to the skip-connections. 
