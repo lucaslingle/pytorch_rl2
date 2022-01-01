@@ -9,11 +9,12 @@ from collections import deque
 import torch as tc
 import numpy as np
 
-from rl2.algos.common import generate_meta_episode, assign_credit, huber_func
+from rl2.envs.abstract import MetaEpisodicEnv
+from rl2.algos.common import (
+    MetaEpisode, generate_meta_episode, assign_credit, huber_func
+)
 from rl2.utils.checkpoint_util import save_checkpoints
 from rl2.utils.typing_util import (
-    MetaEpisode,
-    MetaEpisodicEnv,
     StatefulPolicyNet,
     StatefulValueNet,
     Optimizer,
